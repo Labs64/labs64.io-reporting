@@ -1,0 +1,62 @@
+<svg viewBox="0 0 1200 640" xmlns="http://www.w3.org/2000/svg" width="1200" height="640" role="img" aria-labelledby="t d">
+<title id="t">Labs64.IO Reporting</title>
+<desc id="d">One ClickHouse table holds the events of many customers. Two customers ask for the same metric through Reporting; a catalogue and a row policy give each of them its own rows only.</desc>
+<defs>
+<radialGradient id="hg1" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#1C90ED" stop-opacity=".40"/><stop offset="1" stop-color="#1C90ED" stop-opacity="0"/></radialGradient>
+<radialGradient id="hg2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#2FBF9B" stop-opacity=".20"/><stop offset="1" stop-color="#2FBF9B" stop-opacity="0"/></radialGradient>
+<pattern id="hgrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#E8F1F8" stroke-opacity=".05"/></pattern>
+<clipPath id="hwin"><rect width="1200" height="640" rx="18"/></clipPath>
+<style>
+    .sans{font-family:Roboto,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace}
+    text{white-space:pre}
+    @media (prefers-reduced-motion: reduce){ animate, animateMotion, animateTransform{display:none} }
+  </style>
+</defs>
+<g clip-path="url(#hwin)">
+<rect width="1200" height="640" fill="#07121C"/><rect width="1200" height="640" fill="url(#hgrid)"/>
+<ellipse cx="180" cy="40" rx="420" ry="300" fill="url(#hg1)"/><ellipse cx="1040" cy="560" rx="360" ry="260" fill="url(#hg2)"/>
+<rect width="1200" height="44" fill="#0D1C29"/><line x1="0" y1="44" x2="1200" y2="44" stroke="#E8F1F8" stroke-opacity=".1"/>
+<circle cx="28" cy="22" r="6" fill="#1C90ED"/><circle cx="50" cy="22" r="6" fill="#2FBF9B"/><circle cx="72" cy="22" r="6" fill="#87888A"/>
+<text x="600" y="27" class="mono" font-size="13" fill="#87888A" text-anchor="middle" letter-spacing="0.5">labs64.io-reporting · POST /metrics/query</text>
+<text x="64" y="100" class="sans" font-size="13" font-weight="500" fill="#6DB8F2" letter-spacing="3.6">LABS64.IO  ·  REPORTING</text>
+<text x="64" y="156" class="sans" font-size="48" font-weight="700" fill="#E8F1F8" letter-spacing="-1.4">One store. Many customers.</text>
+<text x="64" y="212" class="sans" font-size="48" font-weight="700" fill="#1C90ED" letter-spacing="-1.4">Each sees only its own rows.</text>
+
+<text x="64" y="272" class="mono" font-size="12" fill="#87888A" letter-spacing="2.4">CLICKHOUSE</text>
+<rect x="64" y="284" width="360" height="264" rx="10" fill="#0D1C29" stroke="#E8F1F8" stroke-opacity=".14"/>
+<g class="mono" font-size="14">
+<text x="84" y="316" fill="#87888A">customer  action   status</text><line x1="84" y1="328" x2="404" y2="328" stroke="#E8F1F8" stroke-opacity=".12"/>
+<text x="84" y="358" fill="#6DB8F2">acme      read     200</text>
+<text x="84" y="392" fill="#5ED6B8">globex    read     200</text>
+<text x="84" y="426" fill="#6DB8F2">acme      write    500</text>
+<text x="84" y="460" fill="#5ED6B8">globex    write    200</text>
+<text x="84" y="494" fill="#6DB8F2">acme      read     200</text>
+<text x="84" y="528" fill="#5ED6B8">globex    read     200</text>
+</g>
+
+<rect x="478" y="340" width="244" height="152" rx="12" fill="#10283B" stroke="#1C90ED" stroke-opacity=".7"/>
+<text x="600" y="376" class="sans" font-size="20" font-weight="700" fill="#E8F1F8" text-anchor="middle">Reporting</text>
+<text x="600" y="408" class="mono" font-size="13" fill="#6DB8F2" text-anchor="middle">catalogue: names, no SQL</text>
+<text x="600" y="434" class="mono" font-size="13" fill="#6DB8F2" text-anchor="middle">filter on the scope</text>
+<text x="600" y="460" class="mono" font-size="13" fill="#5ED6B8" text-anchor="middle">+ row policy on the server</text>
+
+<path d="M424 416H478" stroke="#E8F1F8" stroke-opacity=".3" stroke-width="2"/>
+<path id="pa" d="M722 390C770 390 770 320 812 320" fill="none" stroke="#1C90ED" stroke-width="2"/>
+<path id="pb" d="M722 442C770 442 770 512 812 512" fill="none" stroke="#2FBF9B" stroke-width="2"/>
+<circle r="5" fill="#6DB8F2"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#pa"/></animateMotion></circle>
+<circle r="5" fill="#5ED6B8"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite"><mpath href="#pb"/></animateMotion></circle>
+
+<rect x="812" y="256" width="324" height="128" rx="10" fill="#0D1C29" stroke="#1C90ED" stroke-opacity=".6"/>
+<text x="832" y="288" class="mono" font-size="13" fill="#87888A">X-Reporting-Scope: acme</text>
+<text x="832" y="330" class="sans" font-size="30" font-weight="700" fill="#6DB8F2">3 calls</text>
+<text x="832" y="362" class="mono" font-size="13" fill="#E8F1F8" fill-opacity=".7">read 2 · write 1</text>
+<rect x="812" y="448" width="324" height="128" rx="10" fill="#0D1C29" stroke="#2FBF9B" stroke-opacity=".6"/>
+<text x="832" y="480" class="mono" font-size="13" fill="#87888A">X-Reporting-Scope: globex</text>
+<text x="832" y="522" class="sans" font-size="30" font-weight="700" fill="#5ED6B8">3 calls</text>
+<text x="832" y="554" class="mono" font-size="13" fill="#E8F1F8" fill-opacity=".7">read 2 · write 1</text>
+
+<text x="64" y="598" class="mono" font-size="13" fill="#87888A">Apache-2.0 · Spring Boot · ClickHouse · S3</text>
+<text x="1136" y="618" class="mono" font-size="13" fill="#6DB8F2" text-anchor="end">labs64.io/docs</text>
+<rect x="0" y="636" width="1200" height="4" fill="#1C90ED" opacity=".9"><animate attributeName="width" dur="6s" repeatCount="indefinite" values="0;1200"/></rect>
+</g><rect x=".5" y=".5" width="1199" height="639" rx="18" fill="none" stroke="#E8F1F8" stroke-opacity=".12"/></svg>

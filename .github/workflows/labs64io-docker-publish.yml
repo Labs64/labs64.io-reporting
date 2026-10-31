@@ -1,0 +1,31 @@
+name: Labs64.IO - Reporting - Publish Docker
+
+permissions:
+  contents: read
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-and-push:
+    uses: Labs64/labs64.io-workspace/.github/workflows/docker-publish.yml@v1
+    with:
+      image: labs64/reporting
+      context: .
+      mode: release
+      version: ${{ github.event.release.tag_name }}
+      build-command: mvn -B package
+    secrets: inherit
+
+  # Opens a PR in labs64.io-helm-charts pinning the digest into charts/reporting.
+  propagate-to-chart:
+    name: Pin digest in charts/reporting
+    needs: build-and-push
+    uses: Labs64/labs64.io-workspace/.github/workflows/chart-update-dispatch.yml@v1
+    with:
+      chart: reporting
+      version: ${{ github.event.release.tag_name }}
+      images: ${{ needs.build-and-push.outputs.image-ref }}
+    secrets:
+      CHART_DISPATCH_TOKEN: ${{ secrets.CHART_DISPATCH_TOKEN }}

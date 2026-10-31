@@ -1,0 +1,48 @@
+FROM eclipse-temurin:25-jre
+
+ARG GIT_REVISION=unknown
+# Release version (the git tag) for a published image, "edge" for master builds, "dev" locally.
+ARG VERSION=dev
+
+LABEL org.opencontainers.image.title="Labs64.IO :: Reporting" \
+      org.opencontainers.image.description="Read-only reports over the events stored by AuditFlow sinks" \
+      org.opencontainers.image.url="https://labs64.io" \
+      org.opencontainers.image.source="https://github.com/Labs64/labs64.io-reporting" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.revision="${GIT_REVISION}" \
+      org.opencontainers.image.version="${VERSION}" \
+      io.labs64.edition="ce"
+
+# Build arguments
+ARG USER_ID=1064
+ARG GROUP_ID=1064
+ARG USER_NAME=l64user
+ARG GROUP_NAME=l64group
+
+# Create non-root group and user
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/* && \
+    groupadd -g ${GROUP_ID} ${GROUP_NAME} && \
+    useradd -m -u ${USER_ID} -g ${GROUP_NAME} -s /bin/bash ${USER_NAME}
+
+# OpenTelemetry Java Agent — bundled but inert. Activated at deploy time via
+# JAVA_TOOL_OPTIONS=-javaagent:/otel/opentelemetry-javaagent.jar (observability is an
+# infrastructure concern; the same image runs with and without it). See OBSERVABILITY.md.
+# renovate: datasource=github-releases depName=open-telemetry/opentelemetry-java-instrumentation extractVersion=^v(?<version>.*)$
+ARG OTEL_JAVAAGENT_VERSION=2.33.0
+ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_JAVAAGENT_VERSION}/opentelemetry-javaagent.jar /otel/opentelemetry-javaagent.jar
+RUN chmod 444 /otel/opentelemetry-javaagent.jar
+
+WORKDIR /home/${USER_NAME}
+
+# Copy jar with correct ownership
+COPY --chown=${USER_NAME}:${GROUP_NAME} target/*.jar app.jar
+
+EXPOSE 8080
+
+# Liveness probe support
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD wget -qO- http://localhost:8080/actuator/health/liveness || exit 1
+
+USER ${USER_NAME}
+
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar /home/l64user/app.jar"]
