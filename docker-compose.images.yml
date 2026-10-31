@@ -1,0 +1,45 @@
+# Run Reporting from the published Docker Hub image: no JDK, no Maven, no local build.
+#
+#   docker compose -f docker-compose.images.yml up -d
+#
+# Starts the service next to a ClickHouse holding a small demo tenant (examples/demo). Pin a release with
+# REPORTING_VERSION=0.0.1 (default: latest).
+#
+# This is an evaluation setup: there is no API gateway in front of it, so you send the X-Auth-* headers a gateway
+# would set yourself (see the README). Do not expose it. For the full stack (gateway, authentication, Cerbos) use the
+# Labs64.IO Quickstart: https://labs64.io/docs/getting-started/quickstart/
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.10
+    environment:
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: admin
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - ./examples/demo/clickhouse-init.sql:/docker-entrypoint-initdb.d/demo.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  reporting:
+    image: labs64/reporting:${REPORTING_VERSION:-latest}
+    ports:
+      - "8080:8080"
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USERNAME: reporting
+      CLICKHOUSE_PASSWORD: reader
+    volumes:
+      - ./examples/demo/catalogue:/etc/labs64/reporting/catalogue:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s

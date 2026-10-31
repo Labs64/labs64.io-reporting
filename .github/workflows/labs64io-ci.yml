@@ -1,0 +1,45 @@
+name: Labs64.IO - Reporting - CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: reporting-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-test:
+    uses: Labs64/labs64.io-workspace/.github/workflows/java-ci.yml@v1
+    secrets:
+      L64_PUB_CI_USERNAME: ${{ secrets.L64_PUB_CI_USERNAME }}
+      L64_PUB_CI_PASSWORD: ${{ secrets.L64_PUB_CI_PASSWORD }}
+    with:
+      working-directory: .
+      maven-goals: verify
+      artifact-name: reporting-test-reports
+      docker-build-context: .
+      docker-build-tag: reporting:ci-${{ github.sha }}
+      submit-dependency-graph: true
+
+  # Edge image — pushed to Docker Hub as :edge after a green master build, so
+  # downstream integration environments can run today's master without building it.
+  # labs64.io-tests' nightly regression deploys exactly this image; the release
+  # path, which additionally pins the digest into the Helm chart, stays in
+  # labs64io-docker-publish.yml.
+  edge-image:
+    name: Edge image (labs64/reporting)
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    uses: Labs64/labs64.io-workspace/.github/workflows/docker-publish.yml@v1
+    with:
+      image: labs64/reporting
+      context: .
+      mode: edge
+      build-command: mvn -B -ntp -DskipTests package
+    secrets: inherit

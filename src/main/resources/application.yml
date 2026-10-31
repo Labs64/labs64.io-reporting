@@ -1,0 +1,49 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: labs64.io-reporting
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      slo:
+        http.server.requests: 500ms
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+labs64:
+  openapi:
+    spec-location: classpath:openapi/openapi-reporting-v1.yaml
+    gateway-path: /reporting/api/v1
+    local-path: /
+  auth-context:
+    enabled: ${LABS64_AUTHCONTEXT_ENABLED:true}
+    public-paths:
+      - /actuator
+      - /v3/api-docs
+      - /swagger-ui
+  reporting:
+    catalogue-directory: ${REPORTING_CATALOGUE_DIRECTORY:/etc/labs64/reporting/catalogue}
+    clickhouse:
+      url: ${CLICKHOUSE_URL:http://localhost:8123}
+      username: ${CLICKHOUSE_USERNAME:reporting}
+      password: ${CLICKHOUSE_PASSWORD:}
+    bodies:
+      bucket: ${REPORTING_BODIES_BUCKET:}
+      region: ${AWS_REGION:}

@@ -1,0 +1,34 @@
+database: demo
+metrics:
+  calls:
+    description: Calls per day
+    group: base
+    table: calls
+    scopeColumn: customer
+    time: event_time
+    value: count()
+    dimensions: {action: action}
+    filters: {action: action}
+  calls.allTime:
+    group: base
+    table: calls
+    scopeColumn: customer
+    time: event_time
+    value: count()
+    fullHistory: true
+  errors:
+    group: paid
+    table: calls
+    scopeColumn: customer
+    time: event_time
+    value: countIf(status >= 500)
+events:
+  table: calls
+  scopeColumn: customer
+  time: event_time
+  id: event_id
+  correlation: correlation_id
+  columns: {eventId: toString(event_id), time: toString(event_time), received: toString(received), action: action, status: status}
+  filters: {action: action}
+# Which customer a row belongs to is `scopeColumn`; the caller says which customer it asks for, never the request body.
+status: {table: calls, scopeColumn: customer, received: received}

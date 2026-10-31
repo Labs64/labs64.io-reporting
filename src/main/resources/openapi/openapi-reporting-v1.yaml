@@ -1,0 +1,336 @@
+openapi: 3.0.3
+info:
+  title: Labs64.IO Reporting API
+  version: 1.0.0
+  description: >-
+    Reports over the events a tenant's AuditFlow sinks stored. Read-only. A trusted backend calls it on behalf of one
+    of the tenant's customers: the tenant comes from the token, the customer ("scope") and what it may see from the
+    X-Reporting-* headers, which only a caller with the reporting:read-delegated scope can set. Every operation is
+    POST, because the public edge passes only POST.
+servers:
+  - url: /
+paths:
+  /metrics/list:
+    post:
+      operationId: listMetrics
+      tags: [Reporting]
+      summary: The metrics this caller may query
+      x-labs64:
+        auth:
+          tenant: true
+          scopes: ["reporting:read-delegated"]
+      parameters:
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/Groups"
+        - $ref: "#/components/parameters/HistoryDays"
+      responses:
+        "200":
+          description: Metrics
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MetricList"}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+  /metrics/query:
+    post:
+      operationId: queryMetric
+      tags: [Reporting]
+      summary: A series of one metric
+      x-labs64:
+        auth:
+          tenant: true
+          scopes: ["reporting:read-delegated"]
+      parameters:
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/Groups"
+        - $ref: "#/components/parameters/HistoryDays"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/MetricQuery"}
+      responses:
+        "200":
+          description: Series
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MetricSeries"}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+  /events/search:
+    post:
+      operationId: searchEvents
+      tags: [Reporting]
+      summary: Events, newest first
+      x-labs64:
+        auth:
+          tenant: true
+          scopes: ["reporting:read-delegated"]
+      parameters:
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/Groups"
+        - $ref: "#/components/parameters/HistoryDays"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EventSearch"}
+      responses:
+        "200":
+          description: One page
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/EventPage"}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+  /events/get:
+    post:
+      operationId: getEvent
+      tags: [Reporting]
+      summary: One event
+      x-labs64:
+        auth:
+          tenant: true
+          scopes: ["reporting:read-delegated"]
+      parameters:
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/Groups"
+        - $ref: "#/components/parameters/HistoryDays"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EventRef"}
+      responses:
+        "200":
+          description: The event
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+  /events/body:
+    post:
+      operationId: getEventBody
+      tags: [Reporting]
+      summary: The request and response bodies of one event, from the archive
+      x-labs64:
+        auth:
+          tenant: true
+          scopes: ["reporting:read-delegated"]
+      parameters:
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/Groups"
+        - $ref: "#/components/parameters/HistoryDays"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EventRef"}
+      responses:
+        "200":
+          description: The bodies
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/EventBody"}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+  /traces/get:
+    post:
+      operationId: getTrace
+      tags: [Reporting]
+      summary: Every event of one correlation ID
+      x-labs64:
+        auth:
+          tenant: true
+          scopes: ["reporting:read-delegated"]
+      parameters:
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/Groups"
+        - $ref: "#/components/parameters/HistoryDays"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TraceRef"}
+      responses:
+        "200":
+          description: The events, oldest first
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/EventPage"}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+  /status:
+    post:
+      operationId: getStatus
+      tags: [Reporting]
+      summary: How fresh the data is
+      x-labs64:
+        auth:
+          tenant: true
+          scopes: ["reporting:read-delegated"]
+      parameters:
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/Groups"
+        - $ref: "#/components/parameters/HistoryDays"
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Status"}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+components:
+  parameters:
+    Scope:
+      name: X-Reporting-Scope
+      in: header
+      required: true
+      description: The tenant's customer this call is for.
+      schema: {type: string, pattern: "^[A-Za-z0-9_.:-]{1,128}$"}
+    Groups:
+      name: X-Reporting-Groups
+      in: header
+      required: false
+      description: Comma-separated metric groups this customer may see.
+      schema: {type: string}
+    HistoryDays:
+      name: X-Reporting-History-Days
+      in: header
+      required: false
+      description: How many days back this customer may see, for metrics without full history.
+      schema: {type: integer, format: int32, minimum: 1}
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string}
+        message: {type: string}
+    MetricList:
+      type: object
+      required: [metrics]
+      properties:
+        metrics:
+          type: array
+          items: {$ref: "#/components/schemas/MetricInfo"}
+    MetricInfo:
+      type: object
+      required: [name, dimensions, filters]
+      properties:
+        name: {type: string}
+        description: {type: string}
+        dimensions:
+          type: array
+          items: {type: string}
+        filters:
+          type: array
+          items: {type: string}
+    MetricQuery:
+      type: object
+      required: [metric, from, to]
+      properties:
+        metric: {type: string}
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        interval:
+          type: string
+          enum: [none, hour, day, week, month, year]
+          default: day
+        groupBy:
+          type: array
+          maxItems: 2
+          items: {type: string}
+        filters:
+          type: object
+          additionalProperties:
+            type: array
+            maxItems: 50
+            items: {type: string}
+    MetricSeries:
+      type: object
+      required: [metric, points]
+      properties:
+        metric: {type: string}
+        from:
+          type: string
+          format: date-time
+          description: The start actually used, after the caller's history limit.
+        to: {type: string, format: date-time}
+        points:
+          type: array
+          items: {$ref: "#/components/schemas/MetricPoint"}
+    MetricPoint:
+      type: object
+      required: [value]
+      properties:
+        time: {type: string, format: date-time}
+        dimensions:
+          type: object
+          additionalProperties: {type: string}
+        value: {type: number, format: double}
+    EventSearch:
+      type: object
+      required: [from, to]
+      properties:
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        filters:
+          type: object
+          additionalProperties:
+            type: array
+            maxItems: 50
+            items: {type: string}
+        limit: {type: integer, format: int32, minimum: 1, maximum: 200, default: 50}
+        cursor:
+          type: string
+          description: nextCursor of the previous page.
+    EventPage:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          items: {type: object, additionalProperties: true}
+        nextCursor: {type: string}
+    EventRef:
+      type: object
+      required: [eventId]
+      properties:
+        eventId: {type: string, format: uuid}
+    TraceRef:
+      type: object
+      required: [correlationId]
+      properties:
+        correlationId: {type: string, maxLength: 64}
+    EventBody:
+      type: object
+      properties:
+        requestBody: {type: string}
+        requestBodyTruncated: {type: boolean}
+        responseBody: {type: string}
+        responseBodyTruncated: {type: boolean}
+    Status:
+      type: object
+      properties:
+        dataAsOf:
+          type: string
+          format: date-time
+          description: Receipt time of the newest event stored for this customer.
