@@ -45,4 +45,6 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
 
 USER ${USER_NAME}
 
-ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar /home/l64user/app.jar"]
+# exec: the JVM must be PID 1. Under the shell it never gets SIGTERM, so a pod ignores graceful shutdown and is killed at
+# the end of its grace period.
+ENTRYPOINT ["sh", "-c", "exec java ${JAVA_OPTS} -jar /home/l64user/app.jar"]
