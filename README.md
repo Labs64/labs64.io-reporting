@@ -9,7 +9,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![📖 Documentation](https://img.shields.io/badge/📖-Documentation-AB6543.svg)](https://labs64.io/docs/modules/reporting/)
 
-<p align="center"><img src="docs/assets/reporting-hero.svg" alt="Reporting: one ClickHouse table holds the events of many customers; two customers ask for the same metric and a catalogue and a row policy give each of them its own rows only." width="880"></p>
+<p align="center"><img src="docs/assets/reporting-hero.svg" alt="Reporting: One ClickHouse table holds the rows of many customers. The same calls metric, requested for acme and then globex, shows each customer its own rows and its own numbers while every other row stays masked; metrics come from a reviewed catalogue, never from SQL." width="880"></p>
 
 [**Get started**](#try-it-in-two-minutes) · [Features](#features) · [Architecture](#architecture) · [Catalogue](#the-catalogue) · [AI agents](#using-it-with-ai-agents) · [Ecosystem](#the-labs64io-ecosystem) · [Documentation](https://labs64.io/docs/modules/reporting/) · [labs64.io](https://labs64.io)
 
