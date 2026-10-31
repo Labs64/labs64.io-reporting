@@ -95,7 +95,9 @@ public class ReportingService {
 
         List<MetricPoint> points = new ArrayList<>();
         for (Map<String, Object> row : rows) {
-            MetricPoint point = new MetricPoint().value(((Number) row.get("value")).doubleValue());
+            // A sum over nothing but NULLs is NULL: a day without an amount, not a failure.
+            MetricPoint point = new MetricPoint()
+                    .value(row.get("value") instanceof Number value ? value.doubleValue() : 0d);
             if (row.get("time") != null) {
                 point.time(storedTime(row.get("time").toString()));
             }

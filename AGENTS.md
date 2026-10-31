@@ -47,7 +47,9 @@ just test    # ReportingApiIT needs Docker and skips itself without it
 `docker-compose.images.yml` runs the published image with the demo tenant, no build. Local image: `docker build -t
 labs64/reporting:dev .` after `just build`, then `REPORTING_VERSION=dev docker compose -f docker-compose.images.yml up`.
 
-With Docker Desktop, testcontainers may need `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock`.
+With Docker Desktop, testcontainers may need `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock`. In the devcontainer,
+set `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal` and `TESTCONTAINERS_RYUK_DISABLED=true`; otherwise
+`ReportingApiIT` reports 0 tests and looks green.
 
 ## Working rules
 

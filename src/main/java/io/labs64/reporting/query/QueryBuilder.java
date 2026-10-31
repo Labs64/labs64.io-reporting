@@ -54,8 +54,8 @@ public final class QueryBuilder {
             sql.append(" FINAL");
         }
         sql.append(" WHERE ").append(metric.scopeColumn()).append(" = {scope:String}");
-        sql.append(" AND ").append(metric.time()).append(" >= {from:DateTime64(3)}");
-        sql.append(" AND ").append(metric.time()).append(" < {to:DateTime64(3)}");
+        sql.append(" AND ").append(metric.time()).append(" >= {from:DateTime64(3, 'UTC')}");
+        sql.append(" AND ").append(metric.time()).append(" < {to:DateTime64(3, 'UTC')}");
         if (metric.where() != null) {
             sql.append(" AND (").append(metric.where()).append(")");
         }
@@ -76,14 +76,14 @@ public final class QueryBuilder {
         parameters.put("to", time(to));
 
         StringBuilder sql = select(source);
-        sql.append(" AND ").append(source.time()).append(" >= {from:DateTime64(3)}");
-        sql.append(" AND ").append(source.time()).append(" < {to:DateTime64(3)}");
+        sql.append(" AND ").append(source.time()).append(" >= {from:DateTime64(3, 'UTC')}");
+        sql.append(" AND ").append(source.time()).append(" < {to:DateTime64(3, 'UTC')}");
         appendFilters(sql, parameters, source.filters(), filters);
         if (cursor != null) {
             parameters.put("cursorTime", cursor.time());
             parameters.put("cursorId", cursor.id());
             sql.append(" AND (").append(source.time()).append(", toString(").append(source.id())
-                    .append(")) < ({cursorTime:DateTime64(3)}, {cursorId:String})");
+                    .append(")) < ({cursorTime:DateTime64(3, 'UTC')}, {cursorId:String})");
         }
         sql.append(" ORDER BY ").append(source.time()).append(" DESC, toString(").append(source.id()).append(") DESC");
         sql.append(" LIMIT ").append(limit + 1);
@@ -138,7 +138,7 @@ public final class QueryBuilder {
             OffsetDateTime earliest) {
         if (earliest != null) {
             parameters.put("earliest", time(earliest));
-            sql.append(" AND ").append(source.time()).append(" >= {earliest:DateTime64(3)}");
+            sql.append(" AND ").append(source.time()).append(" >= {earliest:DateTime64(3, 'UTC')}");
         }
     }
 

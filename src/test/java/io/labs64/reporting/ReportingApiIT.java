@@ -1,6 +1,7 @@
 package io.labs64.reporting;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.net.URI;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.DockerClientFactory;
@@ -191,6 +193,24 @@ class ReportingApiIT {
 
         assertThat(ok(post("/traces/get", "A", "base", null, "{\"correlationId\":\"R4\"}")).path("events").size()).isZero();
         assertThat(ok(post("/traces/get", "B", "base", null, "{\"correlationId\":\"R4\"}")).path("events").size()).isEqualTo(1);
+    }
+
+    @Test
+    void aSumOverNothingButNullsIsZeroNotAFailure() throws Exception {
+        JsonNode series = ok(post("/metrics/query", "A", "test", null,
+                "{\"metric\":\"calls.amount\",\"interval\":\"none\"," + RANGE + "}"));
+        assertThat(series.path("points").get(0).path("value").asDouble()).isZero();
+    }
+
+    @Test
+    void aTooLargeAnswerIsTheCallersErrorNotAnOutage() {
+        ClickHouseClient client = new ClickHouseClient(new ReportingProperties.ClickHouse(clickHouseUrl(), "reporting",
+                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6)));
+
+        assertThatThrownBy(() -> client.query("demo", "A", new SqlQuery(
+                "SELECT event_id FROM calls SETTINGS max_result_rows = 1, result_overflow_mode = 'throw'", Map.of())))
+                .isInstanceOfSatisfying(ReportingException.class,
+                        e -> assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test

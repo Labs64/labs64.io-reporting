@@ -16,6 +16,13 @@ metrics:
     time: event_time
     value: count()
     fullHistory: true
+  calls.amount:
+    group: test
+    table: calls
+    scopeColumn: customer
+    time: event_time
+    value: sum(amount)
+    fullHistory: true
   errors:
     group: paid
     table: calls

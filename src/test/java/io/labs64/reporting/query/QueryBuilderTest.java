@@ -69,8 +69,8 @@ class QueryBuilderTest {
         var event = QueryBuilder.event(source, "A", "id", earliest);
         var trace = QueryBuilder.trace(source, "A", "R1", 10, earliest);
 
-        org.assertj.core.api.Assertions.assertThat(event.sql()).contains("event_time >= {earliest:DateTime64(3)}");
-        org.assertj.core.api.Assertions.assertThat(trace.sql()).contains("event_time >= {earliest:DateTime64(3)}");
+        org.assertj.core.api.Assertions.assertThat(event.sql()).contains("event_time >= {earliest:DateTime64(3, 'UTC')}");
+        org.assertj.core.api.Assertions.assertThat(trace.sql()).contains("event_time >= {earliest:DateTime64(3, 'UTC')}");
         org.assertj.core.api.Assertions.assertThat(event.parameters()).containsEntry("earliest", "2026-01-01 00:00:00.000");
         org.assertj.core.api.Assertions.assertThat(QueryBuilder.event(source, "A", "id", null).sql())
                 .doesNotContain("earliest");

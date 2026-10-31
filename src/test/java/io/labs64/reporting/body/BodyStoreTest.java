@@ -11,7 +11,10 @@ import java.util.zip.GZIPOutputStream;
 
 import org.junit.jupiter.api.Test;
 
+import org.springframework.http.HttpStatus;
+
 import io.labs64.reporting.ReportingException;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -23,6 +26,12 @@ class BodyStoreTest {
                 "bodies/tenant={tenant}/customer={scope}/year={yyyy}/month={MM}/day={dd}/{yyyyMMdd-HHmmss}-{eventId}.json.gz",
                 "demo", "V1", "abc", OffsetDateTime.parse("2026-10-01T23:30:05.678+01:00"));
         assertThat(key).isEqualTo("bodies/tenant=demo/customer=V1/year=2026/month=10/day=01/20261001-223005-abc.json.gz");
+    }
+
+    @Test
+    void theScopeInTheKeyIsReducedAsTheSinkReducesIt() {
+        assertThat(BodyStore.key("customer={scope}/{eventId}", "demo", "V:1", "abc", OffsetDateTime.now()))
+                .isEqualTo("customer=V_1/abc");
     }
 
     @Test
@@ -46,5 +55,22 @@ class BodyStoreTest {
             throw S3Exception.builder().message("down").build();
         });
         assertThatThrownBy(() -> down.read("k")).isInstanceOf(ReportingException.class);
+    }
+
+    @Test
+    void aMissingObjectIsEmptyForARoleThatMayNotList() {
+        BodyStore noList = new BodyStore("b", request -> {
+            throw S3Exception.builder().statusCode(403).message("Access Denied").build();
+        });
+        assertThat(noList.read("k")).isEmpty();
+    }
+
+    @Test
+    void aFailureBeforeS3AnswersIsAnOutageToo() {
+        BodyStore unreachable = new BodyStore("b", request -> {
+            throw SdkClientException.create("Unable to execute HTTP request");
+        });
+        assertThatThrownBy(() -> unreachable.read("k")).isInstanceOf(ReportingException.class)
+                .extracting(e -> ((ReportingException) e).status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
 }

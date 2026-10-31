@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,9 @@ public class ClickHouseClient {
     private static final Logger LOG = LoggerFactory.getLogger(ClickHouseClient.class);
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /** TOO_MANY_ROWS and TOO_MANY_ROWS_OR_BYTES: the question is too big, the store is fine. */
+    private static final Set<String> RESULT_TOO_LARGE = Set.of("158", "396");
+
     private final ReportingProperties.ClickHouse properties;
     private final HttpClient http;
 
@@ -44,7 +48,8 @@ public class ClickHouseClient {
 
     public ClickHouseClient(ReportingProperties.ClickHouse properties) {
         this.properties = properties;
-        this.http = HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
+        this.http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(properties.connectTimeout()).build();
     }
 
     public List<Map<String, Object>> query(String database, String scope, SqlQuery query) {
@@ -52,6 +57,8 @@ public class ClickHouseClient {
         url.put("database", database);
         url.put("SQL_scope", scope);
         url.put("output_format_json_quote_64bit_integers", "0");
+        // The status is the query's outcome: without this, a failure after the first bytes still answers 200.
+        url.put("wait_end_of_query", "1");
         query.parameters().forEach((name, value) -> url.put("param_" + name, value));
 
         List<String> pairs = new ArrayList<>();
@@ -64,6 +71,11 @@ public class ClickHouseClient {
                 .POST(HttpRequest.BodyPublishers.ofString(query.sql() + " FORMAT JSON")).build();
         try {
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.headers().firstValue("X-ClickHouse-Exception-Code").filter(RESULT_TOO_LARGE::contains)
+                    .isPresent()) {
+                // One caller's question must not read as an outage: a backend's circuit breaker would stop everyone's.
+                throw ReportingException.badRequest("The answer is too large: narrow the range or use a longer interval.");
+            }
             if (response.statusCode() != 200) {
                 // The server's text may quote a value of the request: the log only, never the caller.
                 LOG.error("ClickHouse refused a query. status={}, answer={}", response.statusCode(),
