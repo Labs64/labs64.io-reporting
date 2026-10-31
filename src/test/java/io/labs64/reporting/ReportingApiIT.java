@@ -109,6 +109,12 @@ class ReportingApiIT {
         return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    private HttpResponse<String> get(String path) throws Exception {
+        return HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+    }
+
     private JsonNode ok(HttpResponse<String> response) throws Exception {
         assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
         return JSON.readTree(response.body());
@@ -211,6 +217,22 @@ class ReportingApiIT {
                 "SELECT event_id FROM calls SETTINGS max_result_rows = 1, result_overflow_mode = 'throw'", Map.of())))
                 .isInstanceOfSatisfying(ReportingException.class,
                         e -> assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    /** Library pairings can fail only on a request (Jackson has before), so these are called, not just wired. */
+    @Test
+    void metricsAndTheApiDocumentAnswer() throws Exception {
+        ok(post("/status", "A", "base", null, ""));
+        HttpResponse<String> metrics = get("/actuator/prometheus");
+        assertThat(metrics.statusCode()).isEqualTo(200);
+        assertThat(metrics.body()).contains("reporting_operation_seconds_count");
+
+        HttpResponse<String> health = get("/actuator/health");
+        assertThat(health.statusCode()).as(health.body()).isEqualTo(200);
+
+        HttpResponse<String> document = get("/v3/api-docs");
+        assertThat(document.statusCode()).as(document.body()).isEqualTo(200);
+        assertThat(document.body()).contains("/metrics/query");
     }
 
     @Test
