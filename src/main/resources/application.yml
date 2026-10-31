@@ -27,6 +27,11 @@ management:
       export:
         enabled: true
 
+springdoc:
+  # The ecosystem's api-docs chart shows the API from /v3/api-docs; the service needs no UI of its own.
+  swagger-ui:
+    enabled: false
+
 labs64:
   openapi:
     spec-location: classpath:openapi/openapi-reporting-v1.yaml

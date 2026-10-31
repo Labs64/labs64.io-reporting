@@ -26,7 +26,12 @@ public class ApiExceptionHandler {
     ResponseEntity<Error> reporting(ReportingException e) {
         ResponseEntity.BodyBuilder response = ResponseEntity.status(e.status());
         if (e.status() == HttpStatus.SERVICE_UNAVAILABLE) {
-            LOG.warn("Reporting unavailable: {}", e.getMessage(), e.getCause());
+            // One line per request, no stack trace: an outage of the store makes every request fail, and a trace each
+            // would flood the log. The cause's class and message say what failed; the trace stays at debug.
+            Throwable cause = e.getCause();
+            LOG.warn("Reporting unavailable: {}{}", e.getMessage(),
+                    cause == null ? "" : " (" + cause.getClass().getSimpleName() + ": " + cause.getMessage() + ")");
+            LOG.debug("Reporting unavailable, in full", e);
             response.header(HttpHeaders.RETRY_AFTER, "30");
         }
         return response.body(new Error().code(e.code()).message(e.getMessage()));
