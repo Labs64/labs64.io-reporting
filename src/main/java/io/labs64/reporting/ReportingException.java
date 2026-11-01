@@ -38,6 +38,10 @@ public class ReportingException extends RuntimeException {
         return new ReportingException(HttpStatus.NOT_FOUND, "NOT_FOUND", message);
     }
 
+    public static ReportingException busy(String message) {
+        return new ReportingException(HttpStatus.TOO_MANY_REQUESTS, "BUSY", message);
+    }
+
     public static ReportingException unavailable(String message, Throwable cause) {
         return new ReportingException(HttpStatus.SERVICE_UNAVAILABLE, "UNAVAILABLE", message, cause);
     }

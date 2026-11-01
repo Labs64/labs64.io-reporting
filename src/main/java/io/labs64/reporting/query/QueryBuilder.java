@@ -142,6 +142,9 @@ public final class QueryBuilder {
         }
     }
 
+    private static final int MAX_FILTER_VALUES = 50;
+    private static final int MAX_FILTER_VALUE_LENGTH = 1024;
+
     private static void appendFilters(StringBuilder sql, Map<String, String> parameters, Map<String, String> allowed,
             Map<String, List<String>> requested) {
         if (requested == null) {
@@ -155,6 +158,11 @@ public final class QueryBuilder {
             }
             if (filter.getValue() == null || filter.getValue().isEmpty()) {
                 throw ReportingException.badRequest("Filter has no value: " + filter.getKey());
+            }
+            // The array travels as one URL field, and past the server's limit it refuses the whole query.
+            if (filter.getValue().size() > MAX_FILTER_VALUES || filter.getValue().stream()
+                    .anyMatch(value -> value == null || value.length() > MAX_FILTER_VALUE_LENGTH)) {
+                throw ReportingException.badRequest("Filter has too many or too long values: " + filter.getKey());
             }
             String name = "filter" + index++;
             parameters.put(name, arrayLiteral(filter.getValue()));
