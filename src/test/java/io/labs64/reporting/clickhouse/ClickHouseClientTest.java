@@ -43,7 +43,7 @@ class ClickHouseClientTest {
     private ClickHouseClient client() {
         return new ClickHouseClient(new ReportingProperties.ClickHouse(
                 "http://127.0.0.1:" + server.getAddress().getPort(), "reporting", "reader", Duration.ofSeconds(2),
-                Duration.ofSeconds(2)));
+                Duration.ofSeconds(2), 4, Duration.ofMillis(500)));
     }
 
     private void assertAnswers(HttpStatus expected) {

@@ -125,7 +125,7 @@ class ReportingApiIT {
     @Test
     void theRowPolicyHoldsEvenForAQueryWithoutAFilter() {
         ClickHouseClient client = new ClickHouseClient(new ReportingProperties.ClickHouse(clickHouseUrl(), "reporting",
-                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6)));
+                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6), 4, java.time.Duration.ofMillis(500)));
 
         List<Map<String, Object>> a = client.query("demo", "A", new SqlQuery("SELECT count() AS c FROM calls", Map.of()));
         List<Map<String, Object>> b = client.query("demo", "B", new SqlQuery("SELECT count() AS c FROM calls", Map.of()));
@@ -211,7 +211,7 @@ class ReportingApiIT {
     @Test
     void aTooLargeAnswerIsTheCallersErrorNotAnOutage() {
         ClickHouseClient client = new ClickHouseClient(new ReportingProperties.ClickHouse(clickHouseUrl(), "reporting",
-                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6)));
+                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6), 4, java.time.Duration.ofMillis(500)));
 
         assertThatThrownBy(() -> client.query("demo", "A", new SqlQuery(
                 "SELECT event_id FROM calls SETTINGS max_result_rows = 1, result_overflow_mode = 'throw'", Map.of())))
@@ -246,7 +246,7 @@ class ReportingApiIT {
     @Test
     void aValueTheServerCannotConvertIsTheCallersErrorNotAnOutage() {
         ClickHouseClient client = new ClickHouseClient(new ReportingProperties.ClickHouse(clickHouseUrl(), "reporting",
-                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6)));
+                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6), 4, java.time.Duration.ofMillis(500)));
 
         assertThatThrownBy(() -> client.query("demo", "A", new SqlQuery("SELECT {at:DateTime64(3, 'UTC')}",
                 Map.of("at", "+12345-01-01 00:00:00.000"))))

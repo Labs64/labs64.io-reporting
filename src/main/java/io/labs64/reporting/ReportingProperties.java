@@ -17,7 +17,9 @@ public record ReportingProperties(
             @DefaultValue("reporting") String username,
             @DefaultValue("") String password,
             @DefaultValue("2s") Duration connectTimeout,
-            @DefaultValue("6s") Duration requestTimeout) {
+            @DefaultValue("6s") Duration requestTimeout,
+            @DefaultValue("4") int maxQueriesPerScope,
+            @DefaultValue("500ms") Duration scopeWait) {
     }
 
     /** {@code bucket} empty: no bodies in this deployment. */

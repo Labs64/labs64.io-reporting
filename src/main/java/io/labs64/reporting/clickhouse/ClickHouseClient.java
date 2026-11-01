@@ -42,6 +42,7 @@ public class ClickHouseClient {
 
     private final ReportingProperties.ClickHouse properties;
     private final HttpClient http;
+    private final ScopeLimiter limiter;
 
     @Autowired
     public ClickHouseClient(ReportingProperties properties) {
@@ -52,9 +53,14 @@ public class ClickHouseClient {
         this.properties = properties;
         this.http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(properties.connectTimeout()).build();
+        this.limiter = new ScopeLimiter(properties.maxQueriesPerScope(), properties.scopeWait());
     }
 
     public List<Map<String, Object>> query(String database, String scope, SqlQuery query) {
+        return limiter.run(scope, () -> send(database, scope, query));
+    }
+
+    private List<Map<String, Object>> send(String database, String scope, SqlQuery query) {
         Map<String, String> url = new LinkedHashMap<>();
         url.put("database", database);
         url.put("SQL_scope", scope);
