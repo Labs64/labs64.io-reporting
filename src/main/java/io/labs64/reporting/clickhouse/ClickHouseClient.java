@@ -37,6 +37,7 @@ public class ClickHouseClient {
 
     /** TOO_MANY_ROWS and TOO_MANY_ROWS_OR_BYTES: the question is too big, the store is fine. */
     private static final Set<String> RESULT_TOO_LARGE = Set.of("158", "396");
+    private static final String VALUE_OUT_OF_RANGE = "457";
 
     private final ReportingProperties.ClickHouse properties;
     private final HttpClient http;
@@ -75,6 +76,10 @@ public class ClickHouseClient {
                     .isPresent()) {
                 // One caller's question must not read as an outage: a backend's circuit breaker would stop everyone's.
                 throw ReportingException.badRequest("The answer is too large: narrow the range or use a longer interval.");
+            }
+            if (response.headers().firstValue("X-ClickHouse-Exception-Code").filter(VALUE_OUT_OF_RANGE::equals)
+                    .isPresent()) {
+                throw ReportingException.badRequest("A value of the request is out of range.");
             }
             if (response.statusCode() != 200) {
                 // The server's text may quote a value of the request: the log only, never the caller.

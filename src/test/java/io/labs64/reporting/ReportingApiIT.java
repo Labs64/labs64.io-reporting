@@ -219,6 +219,29 @@ class ReportingApiIT {
                         e -> assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
+    /** Five 503s open the breaker of the service's backend for every tenant, so a bad date must stay a 400. */
+    @Test
+    void aDateOutsideTheStoresRangeIsTheCallersErrorNotAnOutage() throws Exception {
+        for (String range : List.of("\"from\":\"+12345-01-01T00:00:00Z\",\"to\":\"+12346-01-01T00:00:00Z\"",
+                "\"from\":\"1000-01-01T00:00:00Z\",\"to\":\"2026-01-01T00:00:00Z\"",
+                "\"from\":\"2026-01-01T00:00:00Z\",\"to\":\"+12346-01-01T00:00:00Z\"")) {
+            assertThat(post("/metrics/query", "A", "base", null,
+                    "{\"metric\":\"calls\",\"interval\":\"day\"," + range + "}").statusCode()).as(range).isEqualTo(400);
+            assertThat(post("/events/search", "A", "base", null, "{" + range + "}").statusCode()).as(range).isEqualTo(400);
+        }
+    }
+
+    @Test
+    void aValueTheServerCannotConvertIsTheCallersErrorNotAnOutage() {
+        ClickHouseClient client = new ClickHouseClient(new ReportingProperties.ClickHouse(clickHouseUrl(), "reporting",
+                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6)));
+
+        assertThatThrownBy(() -> client.query("demo", "A", new SqlQuery("SELECT {at:DateTime64(3, 'UTC')}",
+                Map.of("at", "+12345-01-01 00:00:00.000"))))
+                .isInstanceOfSatisfying(ReportingException.class,
+                        e -> assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
     /** Library pairings can fail only on a request (Jackson has before), so these are called, not just wired. */
     @Test
     void metricsAndTheApiDocumentAnswer() throws Exception {

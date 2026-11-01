@@ -44,6 +44,9 @@ public class ReportingService {
     static final int MAX_TRACE_EVENTS = 200;
 
     /** ClickHouse's text for a time, with or without a time of day and fractions. */
+    private static final int MIN_YEAR = 1900;
+    private static final int MAX_YEAR = 2299;
+
     private static final DateTimeFormatter STORED_TIME = new DateTimeFormatterBuilder().appendPattern("yyyy-MM-dd")
             .optionalStart().appendPattern(" HH:mm:ss").optionalStart()
             .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true).optionalEnd().optionalEnd()
@@ -223,6 +226,10 @@ public class ReportingService {
     private static void checkRange(OffsetDateTime from, OffsetDateTime to) {
         if (!from.isBefore(to)) {
             throw ReportingException.badRequest("'from' must be before 'to'.");
+        }
+        // Past DateTime64's range the server refuses the query, which must not read as an outage.
+        if (from.getYear() < MIN_YEAR || to.getYear() > MAX_YEAR) {
+            throw ReportingException.badRequest("The range must lie between the years " + MIN_YEAR + " and " + MAX_YEAR + ".");
         }
     }
 
