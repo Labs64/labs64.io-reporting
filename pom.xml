@@ -11,6 +11,7 @@
 
     <name>Labs64.IO :: Reporting</name>
     <description>Labs64.IO - read-only reports over the events a tenant's AuditFlow sinks stored</description>
+    <url>https://labs64.io</url>
 
     <parent>
         <groupId>io.labs64</groupId>
@@ -20,26 +21,13 @@
     </parent>
 
     <properties>
+        <!-- API VERSIONS -->
+        <reporting.version>v1</reporting.version>
         <aws-sdk.version>2.57.8</aws-sdk.version>
-        <!-- 2.x: Docker 29 no longer speaks the API version of 1.x. -->
-        <testcontainers.version>2.0.5</testcontainers.version>
 
-        <!-- Ahead of what Spring Boot and the parent manage. Jackson moves as a pair and only within the minor line Boot
-             ships (3.1.x with 2.21.x): leaving that line has crash-looped pods before. -->
-        <!-- renovate: datasource=maven depName=tools.jackson:jackson-bom allowedVersions=/^3\.1\./ -->
-        <jackson-bom.version>3.1.8</jackson-bom.version>
-        <!-- renovate: datasource=maven depName=com.fasterxml.jackson:jackson-bom allowedVersions=/^2\.21\./ -->
-        <jackson-2-bom.version>2.21.8</jackson-2-bom.version>
-        <!-- renovate: datasource=maven depName=io.opentelemetry:opentelemetry-bom -->
-        <opentelemetry.version>1.67.0</opentelemetry.version>
-        <!-- renovate: datasource=maven depName=com.google.guava:guava -->
-        <guava.version>33.7.2-android</guava.version>
-        <!-- renovate: datasource=maven depName=io.grpc:grpc-bom -->
-        <grpc.version>1.85.1</grpc.version>
-        <!-- renovate: datasource=maven depName=org.springdoc:springdoc-openapi-bom -->
-        <springdoc.version>3.2.0</springdoc.version>
-        <!-- renovate: datasource=maven depName=org.openapitools:jackson-databind-nullable -->
-        <openapitools.version>0.2.13</openapitools.version>
+        <!-- Ahead of what Spring Boot and the parent manage; drop each once the parent or Boot ships at least that
+             version. Security pins shared by every service (Jackson, OpenTelemetry, guava, gRPC, springdoc) live in
+             labs64io-parent. -->
         <!-- renovate: datasource=maven depName=org.yaml:snakeyaml -->
         <snakeyaml.version>2.7</snakeyaml.version>
         <!-- renovate: datasource=maven depName=io.prometheus:prometheus-metrics-bom -->
@@ -69,16 +57,14 @@
         <maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
         <!-- renovate: datasource=maven depName=org.apache.maven.plugins:maven-failsafe-plugin -->
         <maven-failsafe-plugin.version>3.6.1</maven-failsafe-plugin.version>
-        <!-- renovate: datasource=maven depName=org.apache.maven.plugins:maven-enforcer-plugin -->
-        <maven-enforcer-plugin.version>3.7.0</maven-enforcer-plugin.version>
         <!-- renovate: datasource=maven depName=org.apache.maven.plugins:maven-install-plugin -->
         <maven-install-plugin.version>3.2.0</maven-install-plugin.version>
         <!-- renovate: datasource=maven depName=org.apache.maven.plugins:maven-deploy-plugin -->
         <maven-deploy-plugin.version>3.2.0</maven-deploy-plugin.version>
         <!-- renovate: datasource=maven depName=org.apache.maven.plugins:maven-site-plugin -->
         <maven-site-plugin.version>3.22.0</maven-site-plugin.version>
-        <openapi.source>${project.basedir}/src/main/resources/openapi/openapi-reporting-v1.yaml</openapi.source>
-        <openapi.generated>${project.build.directory}/generated-openapi/openapi-reporting-v1.yaml</openapi.generated>
+        <openapi.source>${project.basedir}/src/main/resources/openapi/openapi-reporting-${reporting.version}.yaml</openapi.source>
+        <openapi.generated>${project.build.directory}/generated-openapi/openapi-reporting-${reporting.version}.yaml</openapi.generated>
         <!-- auth-policy.module must equal the module's gateway prefix (policy-sources.yaml name). -->
         <auth-policy-cerbos.output>${project.build.directory}/cerbos</auth-policy-cerbos.output>
         <auth-public-paths.generated>${project.build.directory}/generated-resources/auth-public-paths</auth-public-paths.generated>
@@ -93,27 +79,6 @@
                 <version>${aws-sdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <!-- The openapi starter pins an older springdoc, so the property alone doesn't reach it. -->
-            <dependency>
-                <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-bom</artifactId>
-                <version>${springdoc.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <!-- Both reach us through the Cerbos SDK, which pins older ones. -->
-            <dependency>
-                <groupId>io.grpc</groupId>
-                <artifactId>grpc-bom</artifactId>
-                <version>${grpc.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>${guava.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -178,7 +143,6 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -256,13 +220,14 @@
                             <inputSpec>${openapi.generated}</inputSpec>
                             <generatorName>spring</generatorName>
                             <output>${project.build.directory}/generated-sources</output>
-                            <apiPackage>io.labs64.reporting.api</apiPackage>
+                            <apiPackage>io.labs64.reporting.${reporting.version}.api</apiPackage>
                             <modelPackage>io.labs64.reporting.model</modelPackage>
                             <generateSupportingFiles>true</generateSupportingFiles>
                             <configOptions>
                                 <useTags>true</useTags>
                                 <interfaceOnly>true</interfaceOnly>
                                 <useSpringBoot3>true</useSpringBoot3>
+                                <useJakartaEe>true</useJakartaEe>
                                 <openApiNullable>false</openApiNullable>
                                 <unhandledException>false</unhandledException>
                                 <containerDefaultToNull>true</containerDefaultToNull>

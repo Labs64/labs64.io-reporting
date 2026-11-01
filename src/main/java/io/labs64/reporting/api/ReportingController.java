@@ -20,6 +20,7 @@ import io.labs64.reporting.model.MetricQuery;
 import io.labs64.reporting.model.MetricSeries;
 import io.labs64.reporting.model.Status;
 import io.labs64.reporting.model.TraceRef;
+import io.labs64.reporting.v1.api.ReportingApi;
 
 @RestController
 public class ReportingController implements ReportingApi {
