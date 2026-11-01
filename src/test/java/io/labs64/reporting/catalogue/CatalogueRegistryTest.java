@@ -33,4 +33,23 @@ class CatalogueRegistryTest {
         assertThatThrownBy(() -> CatalogueRegistry.load(directory)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("broken.yaml");
     }
+
+    private static final String WITHOUT_BODIES = "database: demo\nmetrics: {}\n";
+
+    @Test
+    void bodiesAreEitherAnObjectPerEventOrAFolderOfBatches(@TempDir Path directory) throws Exception {
+        Files.writeString(directory.resolve("object.yaml"), WITHOUT_BODIES + "bodies: {group: g, keyTemplate: 'k/{eventId}'}\n");
+        Files.writeString(directory.resolve("folder.yaml"), WITHOUT_BODIES + "bodies: {group: g, prefixTemplate: 'k/{HH}/'}\n");
+
+        var catalogues = CatalogueRegistry.load(directory);
+        assertThat(catalogues.get("object").bodies().keyTemplate()).isEqualTo("k/{eventId}");
+        assertThat(catalogues.get("folder").bodies().prefixTemplate()).isEqualTo("k/{HH}/");
+    }
+
+    @Test
+    void bodiesWithBothOrNeitherStopTheStart(@TempDir Path directory) throws Exception {
+        Files.writeString(directory.resolve("both.yaml"), WITHOUT_BODIES + "bodies: {group: g, keyTemplate: k, prefixTemplate: p/}\n");
+        assertThatThrownBy(() -> CatalogueRegistry.load(directory)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("both.yaml");
+    }
 }

@@ -26,7 +26,10 @@ public record Catalogue(String database, Map<String, Metric> metrics, EventSourc
     public record Status(String table, String scopeColumn, String received) {
     }
 
-    /** Where one event's archived bodies are. Null: this tenant has none. */
-    public record Bodies(String group, String keyTemplate) {
+    /**
+     * Where one event's archived bodies are, either an object per event or a folder of batches to search. Null: this
+     * tenant has none.
+     */
+    public record Bodies(String group, String keyTemplate, String prefixTemplate) {
     }
 }

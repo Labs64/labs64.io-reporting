@@ -97,7 +97,12 @@ public class CatalogueRegistry {
         Bodies bodies = null;
         if (root.get("bodies") != null) {
             Map<String, Object> b = map(root.get("bodies"), "bodies");
-            bodies = new Bodies(required(b, "group"), required(b, "keyTemplate"));
+            if (b.containsKey("keyTemplate") == b.containsKey("prefixTemplate")) {
+                throw new IllegalArgumentException("bodies: needs either 'keyTemplate' or 'prefixTemplate'");
+            }
+            bodies = b.containsKey("keyTemplate")
+                    ? new Bodies(required(b, "group"), required(b, "keyTemplate"), null)
+                    : new Bodies(required(b, "group"), null, required(b, "prefixTemplate"));
         }
         return new Catalogue(database, Map.copyOf(metrics), events, List.copyOf(trace), status, bodies);
     }

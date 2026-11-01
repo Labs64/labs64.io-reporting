@@ -35,7 +35,7 @@ Reads what AuditFlow's sinks wrote; never writes and owns no database. Reached t
 | `events` | The event list: `table`, `scopeColumn`, `time`, `id`, `correlation`, `columns` (with `eventId`, `time`, `received`), `filters` |
 | `trace` | The sources a trace reads; default `events` |
 | `status` | `table`, `scopeColumn`, `received` |
-| `bodies` | `group`, `keyTemplate`: the object an unbatched S3 sink writes for one event |
+| `bodies` | `group`, and either `prefixTemplate`: the folder a batching S3 sink writes one event's batch under, searched by event ID, its finest part being the receipt minute; or `keyTemplate`: the object an unbatched sink writes for one event |
 
 ## Build and test
 
