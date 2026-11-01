@@ -7,6 +7,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
 import org.junit.jupiter.api.Test;
@@ -72,5 +74,45 @@ class BodyStoreTest {
         });
         assertThatThrownBy(() -> unreachable.read("k")).isInstanceOf(ReportingException.class)
                 .extracting(e -> ((ReportingException) e).status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    private static byte[] gzip(String text) throws Exception {
+        ByteArrayOutputStream gz = new ByteArrayOutputStream();
+        try (GZIPOutputStream out = new GZIPOutputStream(gz)) {
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+        }
+        return gz.toByteArray();
+    }
+
+    @Test
+    void theFolderMatchesWhatABatchingSinkWrites() {
+        String folder = BodyStore.key("bodies/tenant={tenant}/v={scope}/year={yyyy}/month={MM}/day={dd}/hour={HH}/minute={mm}/",
+                "demo", "V1", "abc", OffsetDateTime.parse("2026-10-01T23:30:05.678+01:00"));
+        assertThat(folder).isEqualTo("bodies/tenant=demo/v=V1/year=2026/month=10/day=01/hour=22/minute=30/");
+    }
+
+    @Test
+    void findsAnEventAmongTheBatchesOfAFolder() throws Exception {
+        Map<String, byte[]> objects = Map.of(
+                "f/first.jsonl.gz", gzip("{\"eventId\":\"a\",\"extra\":{\"request\":{\"body\":\"quotes target\"}}}\n"),
+                "f/second.jsonl.gz", gzip("{\"eventId\":\"b\"}\n{\"eventId\":\"target\",\"extra\":{\"request\":{\"body\":\"x\"}}}\n"));
+        BodyStore store = new BodyStore("b", request -> new ByteArrayInputStream(objects.get(request.key())),
+                request -> {
+                    assertThat(request.prefix()).isEqualTo("f/");
+                    return List.of("f/first.jsonl.gz", "f/second.jsonl.gz");
+                });
+
+        assertThat(store.find("f/", "target").orElseThrow().path("extra").path("request").path("body").asText()).isEqualTo("x");
+        assertThat(store.find("f/", "absent")).isEmpty();
+    }
+
+    @Test
+    void aFolderThatCannotBeListedIsAnOutageAndAnEmptyOneIsNotKept() {
+        BodyStore down = new BodyStore("b", request -> null, request -> {
+            throw S3Exception.builder().statusCode(500).message("down").build();
+        });
+        assertThatThrownBy(() -> down.find("f/", "x")).isInstanceOf(ReportingException.class);
+
+        assertThat(new BodyStore("b", request -> null, request -> List.of()).find("f/", "x")).isEmpty();
     }
 }

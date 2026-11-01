@@ -163,9 +163,11 @@ public class ReportingService {
         if (received == null) {
             throw ReportingException.notFound("Unknown event.");
         }
-        String key = BodyStore.key(catalogue.bodies().keyTemplate(), caller.tenant(), caller.scope(),
-                eventId.toString(), storedTime(received.toString()));
-        JsonNode event = bodies.read(key)
+        Catalogue.Bodies where = catalogue.bodies();
+        String template = where.prefixTemplate() != null ? where.prefixTemplate() : where.keyTemplate();
+        String key = BodyStore.key(template, caller.tenant(), caller.scope(), eventId.toString(),
+                storedTime(received.toString()));
+        JsonNode event = (where.prefixTemplate() != null ? bodies.find(key, eventId.toString()) : bodies.read(key))
                 .orElseThrow(() -> ReportingException.notFound("The bodies of this event are no longer kept."));
         JsonNode extra = event.path("extra");
         EventBody body = new EventBody();
