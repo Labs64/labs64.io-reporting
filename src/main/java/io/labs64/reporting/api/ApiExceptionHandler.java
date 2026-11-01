@@ -34,6 +34,9 @@ public class ApiExceptionHandler {
             LOG.debug("Reporting unavailable, in full", e);
             response.header(HttpHeaders.RETRY_AFTER, "30");
         }
+        if (e.status() == HttpStatus.TOO_MANY_REQUESTS) {
+            response.header(HttpHeaders.RETRY_AFTER, "1");
+        }
         return response.body(new Error().code(e.code()).message(e.getMessage()));
     }
 

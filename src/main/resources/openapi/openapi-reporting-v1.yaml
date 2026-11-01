@@ -58,6 +58,7 @@ paths:
         "400": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
         "503": {$ref: "#/components/responses/Error"}
   /events/search:
     post:
@@ -85,6 +86,7 @@ paths:
               schema: {$ref: "#/components/schemas/EventPage"}
         "400": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
         "503": {$ref: "#/components/responses/Error"}
   /events/get:
     post:
@@ -113,6 +115,7 @@ paths:
         "400": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
         "503": {$ref: "#/components/responses/Error"}
   /events/body:
     post:
@@ -141,6 +144,7 @@ paths:
         "400": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
         "503": {$ref: "#/components/responses/Error"}
   /traces/get:
     post:
@@ -168,6 +172,7 @@ paths:
               schema: {$ref: "#/components/schemas/EventPage"}
         "400": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
         "503": {$ref: "#/components/responses/Error"}
   /status:
     post:
@@ -190,6 +195,7 @@ paths:
               schema: {$ref: "#/components/schemas/Status"}
         "400": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
         "503": {$ref: "#/components/responses/Error"}
 components:
   parameters:

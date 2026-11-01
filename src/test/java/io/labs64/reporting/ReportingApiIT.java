@@ -231,6 +231,18 @@ class ReportingApiIT {
         }
     }
 
+    /** Past the server's limit on a URL field the query fails as a 500, so the size is checked before it is sent. */
+    @Test
+    void aFilterTooLargeForTheServerIsTheCallersErrorNotAnOutage() throws Exception {
+        String values = "\"a\"" + ",\"a\"".repeat(20_000);
+        assertThat(post("/metrics/query", "A", "base", null, "{\"metric\":\"calls\",\"filters\":{\"action\":[" + values + "]},"
+                + RANGE + "}").statusCode()).isEqualTo(400);
+
+        String large = "\"" + "a".repeat(200_000) + "\"";
+        assertThat(post("/events/search", "A", "base", null, "{\"filters\":{\"action\":[" + large + "]}," + RANGE + "}")
+                .statusCode()).isEqualTo(400);
+    }
+
     @Test
     void aValueTheServerCannotConvertIsTheCallersErrorNotAnOutage() {
         ClickHouseClient client = new ClickHouseClient(new ReportingProperties.ClickHouse(clickHouseUrl(), "reporting",

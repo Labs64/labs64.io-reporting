@@ -38,6 +38,7 @@ public class ClickHouseClient {
     /** TOO_MANY_ROWS and TOO_MANY_ROWS_OR_BYTES: the question is too big, the store is fine. */
     private static final Set<String> RESULT_TOO_LARGE = Set.of("158", "396");
     private static final String VALUE_OUT_OF_RANGE = "457";
+    private static final String TOO_MANY_QUERIES = "202";
 
     private final ReportingProperties.ClickHouse properties;
     private final HttpClient http;
@@ -80,6 +81,11 @@ public class ClickHouseClient {
             if (response.headers().firstValue("X-ClickHouse-Exception-Code").filter(VALUE_OUT_OF_RANGE::equals)
                     .isPresent()) {
                 throw ReportingException.badRequest("A value of the request is out of range.");
+            }
+            if (response.headers().firstValue("X-ClickHouse-Exception-Code").filter(TOO_MANY_QUERIES::equals)
+                    .isPresent()) {
+                // A burst, not an outage: the store is fine and the caller can ask again in a moment.
+                throw ReportingException.busy("Too many reports at once: ask again in a moment.");
             }
             if (response.statusCode() != 200) {
                 // The server's text may quote a value of the request: the log only, never the caller.
