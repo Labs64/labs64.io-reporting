@@ -31,11 +31,19 @@ Reads what AuditFlow's sinks wrote; never writes and owns no database. Reached t
 | Key | Meaning |
 |---|---|
 | `database` | The ClickHouse database |
+| `maxHistoryDays` | Optional ceiling on the history a caller may see, whatever its backend asserts. A `fullHistory` metric stays exempt |
 | `metrics.<name>` | `group`, `table`, `scopeColumn`, `time`, `value`; optional `fullHistory`, `final`, `where`, `dimensions`, `filters` |
 | `events` | The event list: `table`, `scopeColumn`, `time`, `id`, `correlation`, `columns` (with `eventId`, `time`, `received`), `filters` |
 | `trace` | The sources a trace reads; default `events` |
 | `status` | `table`, `scopeColumn`, `received` |
 | `bodies` | `group`, and either `prefixTemplate`: the folder a batching S3 sink writes one event's batch under, searched by event ID, its finest part being the receipt minute; or `keyTemplate`: the object an unbatched sink writes for one event |
+
+Each SQL fragment must stay one expression over the table's own columns (`SqlFragment`): no `;`, comments or unbalanced
+parentheses, no clause or statement keywords, no functions that reach outside the table, and `IN` only with a list. A
+column named like a keyword needs backticks.
+
+`RowPolicyCheck` proves the row policies by behaviour: as the reader, each catalogue table is asked for a scope nobody
+has. Don't replace it with a look at the policy metadata: a view is protected by the policy on its base table.
 
 ## Build and test
 

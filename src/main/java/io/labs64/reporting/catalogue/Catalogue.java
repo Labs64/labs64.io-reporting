@@ -6,9 +6,12 @@ import java.util.Map;
 /**
  * What one tenant offers. SQL fragments here are reviewed configuration, never request input: a request only picks
  * names out of these maps.
+ *
+ * @param maxHistoryDays the most history this tenant's callers may see, whatever they assert; null: what they assert.
+ *                       A metric marked {@code fullHistory} stays exempt.
  */
 public record Catalogue(String database, Map<String, Metric> metrics, EventSource events, List<EventSource> trace,
-        Status status, Bodies bodies) {
+        Status status, Bodies bodies, Integer maxHistoryDays) {
 
     /** A value aggregated over one table. */
     public record Metric(String name, String description, String group, String table, String scopeColumn, String time,

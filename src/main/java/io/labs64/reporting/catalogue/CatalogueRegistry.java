@@ -50,6 +50,11 @@ public class CatalogueRegistry {
         return Optional.ofNullable(catalogues.get(tenant));
     }
 
+    /** Every tenant's catalogue, by tenant. */
+    public Map<String, Catalogue> all() {
+        return catalogues;
+    }
+
     static Map<String, Catalogue> load(Path directory) {
         Map<String, Catalogue> result = new LinkedHashMap<>();
         if (!Files.isDirectory(directory)) {
@@ -92,7 +97,7 @@ public class CatalogueRegistry {
         Status status = null;
         if (root.get("status") != null) {
             Map<String, Object> s = map(root.get("status"), "status");
-            status = new Status(identifier(s, "table"), identifier(s, "scopeColumn"), required(s, "received"));
+            status = new Status(identifier(s, "table"), identifier(s, "scopeColumn"), expression(s, "received"));
         }
         Bodies bodies = null;
         if (root.get("bodies") != null) {
@@ -104,25 +109,36 @@ public class CatalogueRegistry {
                     ? new Bodies(required(b, "group"), required(b, "keyTemplate"), null)
                     : new Bodies(required(b, "group"), null, required(b, "prefixTemplate"));
         }
-        return new Catalogue(database, Map.copyOf(metrics), events, List.copyOf(trace), status, bodies);
+        return new Catalogue(database, Map.copyOf(metrics), events, List.copyOf(trace), status, bodies,
+                maxHistoryDays(root.get("maxHistoryDays")));
+    }
+
+    private static Integer maxHistoryDays(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (!(value instanceof Integer days) || days < 1) {
+            throw new IllegalArgumentException("'maxHistoryDays' must be a whole number of at least 1");
+        }
+        return days;
     }
 
     private static Metric metric(String name, Map<String, Object> m) {
         return new Metric(name, (String) m.get("description"), required(m, "group"), identifier(m, "table"),
-                identifier(m, "scopeColumn"), required(m, "time"), required(m, "value"),
-                Boolean.TRUE.equals(m.get("fullHistory")), Boolean.TRUE.equals(m.get("final")), (String) m.get("where"),
-                strings(m.get("dimensions")), strings(m.get("filters")));
+                identifier(m, "scopeColumn"), expression(m, "time"), expression(m, "value"),
+                Boolean.TRUE.equals(m.get("fullHistory")), Boolean.TRUE.equals(m.get("final")), optionalExpression(m, "where"),
+                expressions(m.get("dimensions")), expressions(m.get("filters")));
     }
 
     private static EventSource source(String name, Map<String, Object> s) {
-        Map<String, String> columns = strings(s.get("columns"));
+        Map<String, String> columns = expressions(s.get("columns"));
         if (columns.isEmpty()) {
             throw new IllegalArgumentException(name + ": needs columns");
         }
         columns.keySet().forEach(CatalogueRegistry::requireIdentifier);
-        return new EventSource(name, identifier(s, "table"), identifier(s, "scopeColumn"), required(s, "time"),
-                required(s, "id"), required(s, "correlation"), Boolean.TRUE.equals(s.get("final")),
-                (String) s.get("where"), columns, strings(s.get("filters")));
+        return new EventSource(name, identifier(s, "table"), identifier(s, "scopeColumn"), expression(s, "time"),
+                expression(s, "id"), expression(s, "correlation"), Boolean.TRUE.equals(s.get("final")),
+                optionalExpression(s, "where"), columns, expressions(s.get("filters")));
     }
 
     private static String identifier(Map<String, Object> map, String key) {
@@ -134,6 +150,20 @@ public class CatalogueRegistry {
             throw new IllegalArgumentException("'" + value + "' is not an identifier");
         }
         return value;
+    }
+
+    private static String expression(Map<String, Object> map, String key) {
+        return SqlFragment.check(required(map, key));
+    }
+
+    private static String optionalExpression(Map<String, Object> map, String key) {
+        return map.get(key) == null ? null : expression(map, key);
+    }
+
+    private static Map<String, String> expressions(Object value) {
+        Map<String, String> result = strings(value);
+        result.values().forEach(SqlFragment::check);
+        return result;
     }
 
     private static String required(Map<String, Object> map, String key) {

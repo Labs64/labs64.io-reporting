@@ -54,8 +54,8 @@ public final class QueryBuilder {
             sql.append(" FINAL");
         }
         sql.append(" WHERE ").append(metric.scopeColumn()).append(" = {scope:String}");
-        sql.append(" AND ").append(metric.time()).append(" >= {from:DateTime64(3, 'UTC')}");
-        sql.append(" AND ").append(metric.time()).append(" < {to:DateTime64(3, 'UTC')}");
+        sql.append(" AND ").append(operand(metric.time())).append(" >= {from:DateTime64(3, 'UTC')}");
+        sql.append(" AND ").append(operand(metric.time())).append(" < {to:DateTime64(3, 'UTC')}");
         if (metric.where() != null) {
             sql.append(" AND (").append(metric.where()).append(")");
         }
@@ -76,13 +76,13 @@ public final class QueryBuilder {
         parameters.put("to", time(to));
 
         StringBuilder sql = select(source);
-        sql.append(" AND ").append(source.time()).append(" >= {from:DateTime64(3, 'UTC')}");
-        sql.append(" AND ").append(source.time()).append(" < {to:DateTime64(3, 'UTC')}");
+        sql.append(" AND ").append(operand(source.time())).append(" >= {from:DateTime64(3, 'UTC')}");
+        sql.append(" AND ").append(operand(source.time())).append(" < {to:DateTime64(3, 'UTC')}");
         appendFilters(sql, parameters, source.filters(), filters);
         if (cursor != null) {
             parameters.put("cursorTime", cursor.time());
             parameters.put("cursorId", cursor.id());
-            sql.append(" AND (").append(source.time()).append(", toString(").append(source.id())
+            sql.append(" AND (").append(operand(source.time())).append(", toString(").append(source.id())
                     .append(")) < ({cursorTime:DateTime64(3, 'UTC')}, {cursorId:String})");
         }
         sql.append(" ORDER BY ").append(source.time()).append(" DESC, toString(").append(source.id()).append(") DESC");
@@ -109,7 +109,7 @@ public final class QueryBuilder {
         parameters.put("correlationId", correlationId);
         StringBuilder sql = select(source);
         appendEarliest(sql, parameters, source, earliest);
-        sql.append(" AND ").append(source.correlation()).append(" = {correlationId:String}");
+        sql.append(" AND ").append(operand(source.correlation())).append(" = {correlationId:String}");
         sql.append(" ORDER BY ").append(source.time()).append(" LIMIT ").append(limit);
         return new SqlQuery(sql.toString(), parameters);
     }
@@ -138,7 +138,7 @@ public final class QueryBuilder {
             OffsetDateTime earliest) {
         if (earliest != null) {
             parameters.put("earliest", time(earliest));
-            sql.append(" AND ").append(source.time()).append(" >= {earliest:DateTime64(3, 'UTC')}");
+            sql.append(" AND ").append(operand(source.time())).append(" >= {earliest:DateTime64(3, 'UTC')}");
         }
     }
 
@@ -182,6 +182,14 @@ public final class QueryBuilder {
             case "year" -> "toStartOfYear(" + utc + ")";
             default -> throw ReportingException.badRequest("Unknown interval: " + interval);
         };
+    }
+
+    /**
+     * A catalogue fragment as one operand. Without the parentheses, a fragment such as {@code a OR b} would bind looser
+     * than the {@code AND} that keeps the scope filter, and lift it.
+     */
+    private static String operand(String fragment) {
+        return "(" + fragment + ")";
     }
 
     private static String time(OffsetDateTime value) {

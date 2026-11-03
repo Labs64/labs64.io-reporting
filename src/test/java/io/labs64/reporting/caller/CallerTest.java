@@ -46,6 +46,15 @@ class CallerTest {
         }
     }
 
+    /** Spring joins a repeated header with a comma: two scopes on one request must not read as either of them. */
+    @Test
+    void aRepeatedOrEncodedScopeIsRefused() {
+        for (String scope : new String[] { "A,B", "A, B", "A%2CB", "A\nB" }) {
+            assertThatThrownBy(() -> Caller.of(context("demo", Caller.DELEGATION_SCOPE), scope, null, null))
+                    .as(scope).hasMessageContaining("X-Reporting-Scope");
+        }
+    }
+
     @Test
     void noGroupsMeansNoMetrics() {
         assertThat(Caller.of(context("demo", Caller.DELEGATION_SCOPE), "V1", null, null).groups()).isEmpty();

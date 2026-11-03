@@ -27,7 +27,9 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.labs64.reporting.catalogue.CatalogueRegistry;
 import io.labs64.reporting.clickhouse.ClickHouseClient;
+import io.labs64.reporting.clickhouse.RowPolicyCheck;
 import io.labs64.reporting.query.SqlQuery;
 
 /**
@@ -294,5 +296,77 @@ class ReportingApiIT {
                         .header("X-Reporting-Scope", "A").POST(HttpRequest.BodyPublishers.noBody()).build(),
                 HttpResponse.BodyHandlers.ofString());
         assertThat(wrongScope.statusCode()).isEqualTo(403);
+    }
+
+    /** A view without a policy of its own, protected by its base table's, is what a metadata check would get wrong. */
+    @Test
+    void theRowPolicyCheckTellsAnUnprotectedTableFromAProtectedOne() throws Exception {
+        admin("CREATE TABLE demo.unprotected (customer String) ENGINE = MergeTree ORDER BY customer");
+        admin("INSERT INTO demo.unprotected VALUES ('A')");
+        admin("GRANT SELECT ON demo.unprotected TO reporting");
+        admin("CREATE VIEW demo.calls_view AS SELECT customer FROM demo.calls");
+        admin("GRANT SELECT ON demo.calls_view TO reporting");
+        try {
+            ClickHouseClient client = new ClickHouseClient(new ReportingProperties.ClickHouse(clickHouseUrl(), "reporting",
+                    "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6), 4, java.time.Duration.ofMillis(500)));
+            RowPolicyCheck check = new RowPolicyCheck(new CatalogueRegistry(Map.of("demo", CatalogueRegistry.parse(Map.of("database", "demo",
+                    "metrics", Map.of(
+                            "bad", Map.of("group", "g", "table", "unprotected", "scopeColumn", "customer", "time", "t", "value", "count()"),
+                            "view", Map.of("group", "g", "table", "calls_view", "scopeColumn", "customer", "time", "t", "value", "count()"),
+                            "good", Map.of("group", "g", "table", "calls", "scopeColumn", "customer", "time", "t", "value", "count()")))))),
+                    client, new ReportingProperties(java.nio.file.Path.of("x"), null, null, ReportingProperties.RowPolicyCheck.STRICT),
+                    new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+
+            check.check();
+
+            assertThat(check.health().getStatus()).isEqualTo(org.springframework.boot.health.contributor.Status.OUT_OF_SERVICE);
+            assertThat(check.health().getDetails().get("unprotectedTables").toString())
+                    .contains("demo.unprotected").doesNotContain("calls");
+        } finally {
+            admin("DROP TABLE demo.unprotected");
+            admin("DROP VIEW demo.calls_view");
+        }
+    }
+
+    @Test
+    void theContractsLimitsAreEnforced() throws Exception {
+        assertThat(post("/metrics/query", "A", "base", null,
+                "{\"metric\":\"calls\",\"groupBy\":[\"action\",\"action\",\"action\"]," + RANGE + "}").statusCode()).isEqualTo(400);
+        assertThat(post("/events/search", "A", "base", null, "{\"limit\":201," + RANGE + "}").statusCode()).isEqualTo(400);
+        assertThat(post("/events/search", "A", "base", null, "{\"limit\":0," + RANGE + "}").statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    void aRepeatedScopeHeaderIsRefused() throws Exception {
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/metrics/list"))
+                        .header("X-Auth-User", "service:backend").header("X-Auth-Tenant", "demo")
+                        .header("X-Auth-Scopes", "reporting:read-delegated").header("X-Request-ID", "t")
+                        .header("X-Reporting-Scope", "A").header("X-Reporting-Scope", "B")
+                        .POST(HttpRequest.BodyPublishers.noBody()).build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(400);
+    }
+
+    /** A cursor is only a position: another scope's cursor moves within the caller's rows and shows none of the other's. */
+    @Test
+    void anotherScopesCursorShowsOnlyTheCallersRows() throws Exception {
+        JsonNode ofA = ok(post("/events/search", "A", "base", null, "{\"limit\":1," + RANGE + "}"));
+        JsonNode asB = ok(post("/events/search", "B", "base", null,
+                "{\"limit\":10,\"cursor\":\"" + ofA.path("nextCursor").asText() + "\"," + RANGE + "}"));
+        assertThat(asB.path("events").findValuesAsText("eventId")).containsOnly("00000000-0000-0000-0000-00000000000d");
+    }
+
+    /** The tenant is the gateway's: a header the request adds names none. */
+    @Test
+    void aRequestCannotNameAnotherTenant() throws Exception {
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/metrics/list"))
+                        .header("X-Auth-User", "service:backend").header("X-Auth-Tenant", "nobody")
+                        .header("X-Auth-Scopes", "reporting:read-delegated").header("X-Request-ID", "t")
+                        .header("X-Reporting-Tenant", "demo").header("X-Reporting-Scope", "A")
+                        .POST(HttpRequest.BodyPublishers.noBody()).build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode()).isEqualTo(403);
     }
 }

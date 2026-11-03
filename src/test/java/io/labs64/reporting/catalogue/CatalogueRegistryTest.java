@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -51,5 +53,36 @@ class CatalogueRegistryTest {
         Files.writeString(directory.resolve("both.yaml"), WITHOUT_BODIES + "bodies: {group: g, keyTemplate: k, prefixTemplate: p/}\n");
         assertThatThrownBy(() -> CatalogueRegistry.load(directory)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("both.yaml");
+    }
+
+    @Test
+    void aFragmentThatCouldEscapeItsPlaceStopsTheStart(@TempDir Path directory) throws Exception {
+        Files.writeString(directory.resolve("escape.yaml"), "database: demo\nmetrics: {m: {group: g, table: t, scopeColumn: c, "
+                + "time: at, value: count(), where: \"a = 1) OR (1 = 1\"}}\n");
+        assertThatThrownBy(() -> CatalogueRegistry.load(directory)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("escape.yaml");
+    }
+
+    @Test
+    void everyFragmentFieldIsChecked() {
+        for (String field : List.of("time", "value", "where")) {
+            Map<String, Object> metric = new HashMap<>(Map.of("group", "g", "table", "t", "scopeColumn", "c", "time", "at", "value", "count()"));
+            metric.put(field, "x; DROP TABLE t");
+            assertThatThrownBy(() -> CatalogueRegistry.parse(Map.of("database", "d", "metrics", Map.of("m", metric))))
+                    .as(field).isInstanceOf(IllegalArgumentException.class);
+        }
+        Map<String, Object> dimension = Map.of("group", "g", "table", "t", "scopeColumn", "c", "time", "at", "value", "count()",
+                "dimensions", Map.of("d", "(SELECT 1)"));
+        assertThatThrownBy(() -> CatalogueRegistry.parse(Map.of("database", "d", "metrics", Map.of("m", dimension))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void theHistoryCeilingIsAPositiveWholeNumber(@TempDir Path directory) throws Exception {
+        Files.writeString(directory.resolve("ok.yaml"), WITHOUT_BODIES + "maxHistoryDays: 90\n");
+        assertThat(CatalogueRegistry.load(directory).get("ok").maxHistoryDays()).isEqualTo(90);
+
+        Files.writeString(directory.resolve("zero.yaml"), WITHOUT_BODIES + "maxHistoryDays: 0\n");
+        assertThatThrownBy(() -> CatalogueRegistry.load(directory)).hasMessageContaining("zero.yaml");
     }
 }
