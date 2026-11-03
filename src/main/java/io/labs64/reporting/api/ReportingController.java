@@ -27,10 +27,12 @@ public class ReportingController implements ReportingApi {
 
     private final ReportingService service;
     private final MeterRegistry meters;
+    private final BodyAccessLog bodyAccess;
 
-    public ReportingController(ReportingService service, MeterRegistry meters) {
+    public ReportingController(ReportingService service, MeterRegistry meters, BodyAccessLog bodyAccess) {
         this.service = service;
         this.meters = meters;
+        this.bodyAccess = bodyAccess;
     }
 
     /** Timed per operation and tenant, never per scope: a tenant's customers would make the series unbounded. */
@@ -70,7 +72,7 @@ public class ReportingController implements ReportingApi {
 
     @Override
     public ResponseEntity<EventBody> getEventBody(String scope, EventRef ref, String groups, Integer historyDays) {
-        return timed("getEventBody", scope, groups, historyDays, caller -> service.getBody(caller, ref.getEventId()));
+        return timed("getEventBody", scope, groups, historyDays, caller -> bodyAccess.record(caller, ref.getEventId(), () -> service.getBody(caller, ref.getEventId())));
     }
 
     @Override

@@ -10,7 +10,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record ReportingProperties(
         @DefaultValue("/etc/labs64/reporting/catalogue") Path catalogueDirectory,
         ClickHouse clickhouse,
-        Bodies bodies) {
+        Bodies bodies,
+        @DefaultValue("strict") RowPolicyCheck rowPolicyCheck) {
+
+    /** What a table readable without a row policy does: {@code strict} fails readiness, {@code warn} only reports it. */
+    public enum RowPolicyCheck {
+        STRICT, WARN
+    }
 
     public record ClickHouse(
             @DefaultValue("http://localhost:8123") String url,

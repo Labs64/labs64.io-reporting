@@ -59,6 +59,25 @@ class QueryBuilderTest {
         assertThatThrownBy(() -> Cursor.decode(tampered)).isInstanceOf(ReportingException.class);
     }
 
+    /** A fragment such as {@code a OR b} must not bind looser than the AND that keeps the scope filter. */
+    @Test
+    void everyFragmentInAPredicateIsOneOperand() {
+        var source = new io.labs64.reporting.catalogue.Catalogue.EventSource("events", "calls", "customer", "t1 OR t2",
+                "event_id", "c1 OR c2", false, null, Map.of("eventId", "toString(event_id)"), Map.of());
+        var metric = new Metric("m", null, "base", "t", "customer", "t1 OR t2", "count()", false, false, null, Map.of(),
+                Map.of());
+        var cursor = new Cursor("2026-10-01 10:00:00.000", "00000000-0000-0000-0000-00000000000a");
+        var earliest = OffsetDateTime.parse("2026-01-01T00:00:00Z");
+
+        assertThat(QueryBuilder.metric(metric, "A", FROM, TO, "none", List.of(), null).sql())
+                .contains("(t1 OR t2) >= {from").contains("(t1 OR t2) < {to").doesNotContain(" t1 OR t2 >");
+        assertThat(QueryBuilder.events(source, "A", FROM, TO, null, 10, cursor).sql())
+                .contains("(t1 OR t2) >= {from").contains("(t1 OR t2) < {to").contains("((t1 OR t2), toString(");
+        assertThat(QueryBuilder.trace(source, "A", "R1", 10, earliest).sql())
+                .contains("(c1 OR c2) = {correlationId").contains("(t1 OR t2) >= {earliest");
+        assertThat(QueryBuilder.event(source, "A", "id", earliest).sql()).contains("(t1 OR t2) >= {earliest");
+    }
+
     @Test
     void oneEventAndATraceStayInsideTheCallersHistory() {
         var source = new io.labs64.reporting.catalogue.Catalogue.EventSource("events", "calls", "customer", "event_time",
@@ -69,8 +88,8 @@ class QueryBuilderTest {
         var event = QueryBuilder.event(source, "A", "id", earliest);
         var trace = QueryBuilder.trace(source, "A", "R1", 10, earliest);
 
-        org.assertj.core.api.Assertions.assertThat(event.sql()).contains("event_time >= {earliest:DateTime64(3, 'UTC')}");
-        org.assertj.core.api.Assertions.assertThat(trace.sql()).contains("event_time >= {earliest:DateTime64(3, 'UTC')}");
+        org.assertj.core.api.Assertions.assertThat(event.sql()).contains("(event_time) >= {earliest:DateTime64(3, 'UTC')}");
+        org.assertj.core.api.Assertions.assertThat(trace.sql()).contains("(event_time) >= {earliest:DateTime64(3, 'UTC')}");
         org.assertj.core.api.Assertions.assertThat(event.parameters()).containsEntry("earliest", "2026-01-01 00:00:00.000");
         org.assertj.core.api.Assertions.assertThat(QueryBuilder.event(source, "A", "id", null).sql())
                 .doesNotContain("earliest");

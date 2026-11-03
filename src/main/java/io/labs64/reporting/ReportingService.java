@@ -89,7 +89,7 @@ public class ReportingService {
             throw ReportingException.forbidden("This metric is not part of the caller's plan.");
         }
         checkRange(request.getFrom(), request.getTo());
-        OffsetDateTime from = metric.fullHistory() ? request.getFrom() : clamp(request.getFrom(), caller);
+        OffsetDateTime from = metric.fullHistory() ? request.getFrom() : clamp(request.getFrom(), caller, catalogue);
         String interval = request.getInterval() == null ? "day" : request.getInterval().getValue();
         List<String> groupBy = request.getGroupBy() == null ? List.of() : request.getGroupBy();
 
@@ -122,7 +122,7 @@ public class ReportingService {
         checkRange(request.getFrom(), request.getTo());
         int limit = request.getLimit() == null ? 50 : request.getLimit();
         List<Map<String, Object>> rows = clickHouse.query(catalogue.database(), caller.scope(),
-                QueryBuilder.events(source, caller.scope(), clamp(request.getFrom(), caller), request.getTo(),
+                QueryBuilder.events(source, caller.scope(), clamp(request.getFrom(), caller, catalogue), request.getTo(),
                         request.getFilters(), limit, Cursor.decode(request.getCursor())));
 
         EventPage page = new EventPage();
@@ -143,7 +143,7 @@ public class ReportingService {
         List<Map<String, Object>> events = new ArrayList<>();
         for (EventSource source : catalogue.trace()) {
             events.addAll(clickHouse.query(catalogue.database(), caller.scope(),
-                    QueryBuilder.trace(source, caller.scope(), correlationId, MAX_TRACE_EVENTS, earliest(caller))));
+                    QueryBuilder.trace(source, caller.scope(), correlationId, MAX_TRACE_EVENTS, earliest(caller, catalogue))));
         }
         events.sort(Comparator.comparing(row -> String.valueOf(row.get("time"))));
         return new EventPage().events(events);
@@ -196,7 +196,7 @@ public class ReportingService {
     private Map<String, Object> row(Caller caller, String eventId) {
         Catalogue catalogue = catalogue(caller);
         List<Map<String, Object>> rows = clickHouse.query(catalogue.database(), caller.scope(),
-                QueryBuilder.event(events(catalogue), caller.scope(), eventId, earliest(caller)));
+                QueryBuilder.event(events(catalogue), caller.scope(), eventId, earliest(caller, catalogue)));
         if (rows.isEmpty()) {
             throw ReportingException.notFound("Unknown event.");
         }
@@ -215,14 +215,25 @@ public class ReportingService {
         return catalogue.events();
     }
 
-    private OffsetDateTime clamp(OffsetDateTime from, Caller caller) {
-        OffsetDateTime earliest = earliest(caller);
+    private OffsetDateTime clamp(OffsetDateTime from, Caller caller, Catalogue catalogue) {
+        OffsetDateTime earliest = earliest(caller, catalogue);
         return earliest != null && from.isBefore(earliest) ? earliest : from;
     }
 
-    /** The start of what this caller may see, whichever way it asks. Null: no limit. */
-    private OffsetDateTime earliest(Caller caller) {
-        return caller.historyDays() == null ? null : OffsetDateTime.now(clock).minusDays(caller.historyDays());
+    /**
+     * The start of what this caller may see, whichever way it asks: the shorter of what its backend asserts and what
+     * the tenant's catalogue allows. Null: no limit, also for a limit older than the store can hold, which it would
+     * otherwise refuse as a value out of range.
+     */
+    private OffsetDateTime earliest(Caller caller, Catalogue catalogue) {
+        Integer days = caller.historyDays() == null ? catalogue.maxHistoryDays()
+                : catalogue.maxHistoryDays() == null ? caller.historyDays()
+                        : Integer.valueOf(Math.min(caller.historyDays(), catalogue.maxHistoryDays()));
+        if (days == null) {
+            return null;
+        }
+        OffsetDateTime earliest = OffsetDateTime.now(clock).minusDays(days);
+        return earliest.getYear() < MIN_YEAR ? null : earliest;
     }
 
     private static void checkRange(OffsetDateTime from, OffsetDateTime to) {

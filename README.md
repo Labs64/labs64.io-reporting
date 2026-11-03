@@ -71,8 +71,8 @@ Mount your catalogues at `/etc/labs64/reporting/catalogue` (values `volumes`, `v
 - **Metric catalogue**: one YAML file per tenant, validated at start. An invalid file stops the rollout instead of serving wrong numbers.
 - **Metrics API**: a series by range and interval, with up to two dimensions and filters.
 - **Event list and traces**: events paged by cursor, newest first, and every event of one correlation ID.
-- **Bodies from S3**: an event's archived request and response, fetched by a key computed from its row. Optional, and limited to a group you name.
-- **Groups and history**: your backend translates a plan into `X-Reporting-Groups` and `X-Reporting-History-Days`. This service knows no plan names.
+- **Bodies from S3**: an event's archived request and response, fetched by a key computed from its row. Optional, limited to a group you name, and every read leaves a log line and a `reporting.body.access` count.
+- **Groups and history**: your backend translates a plan into `X-Reporting-Groups` and `X-Reporting-History-Days`. This service knows no plan names; a catalogue's `maxHistoryDays` caps what a backend asserts.
 - **Bounded**: query limits sit on the ClickHouse user, and a store that does not answer gives a `503` with `Retry-After`.
 - **OpenAPI-first**: the [contract](src/main/resources/openapi/openapi-reporting-v1.yaml) generates the server interfaces and the gateway policies.
 - **Observable**: Actuator health, Prometheus metrics (`reporting.operation`, per operation and tenant, never per customer) and OTLP traces.
@@ -121,12 +121,15 @@ metrics:
 | `REPORTING_CATALOGUE_DIRECTORY` | Where `<tenant>.yaml` files are mounted |
 | `CLICKHOUSE_URL`, `CLICKHOUSE_USERNAME`, `CLICKHOUSE_PASSWORD` | The reader user |
 | `REPORTING_BODIES_BUCKET`, `AWS_REGION` | The archive; empty means no bodies |
+| `REPORTING_ROW_POLICY_CHECK` | `strict` (default): a table readable without a row policy fails readiness. `warn`: it is only logged and counted |
+| `REPORTING_ROW_POLICY_RECHECK` | How often that check repeats after the start; default `PT5M` |
 
 ## Before you go to production
 
 - **Put it behind the API Gateway.** The service trusts the `X-Auth-*` headers it receives. Only a caller with `reporting:read-delegated` may name a scope, so give that role to your backend alone.
-- **Give the reader a row policy on every table it can read.** `readonly = 2` and `SQL_scope` make it work; without a policy the second line of defence is simply absent.
-- **Limit the reader in ClickHouse.** Execution time, result rows and memory belong in its settings profile.
+- **Give the reader a row policy on every table it can read.** `readonly = 2` and `SQL_scope` make it work. The service proves it at the start and every few minutes by asking each catalogue table for a scope nobody has: a row back fails readiness, for every tenant of the pod, and names the table. An empty table can't be proven until it holds rows.
+- **Limit the reader in ClickHouse.** Execution time, result rows and memory belong in its settings profile. The service caps no range or bucket count: the result-row limit measures what a query really returns, and answers a `400`.
+- **Close the way around the gateway.** The chart's `networkPolicy.enabled` is off by default; turn it on.
 - **A compromised pod can set any scope.** The row policy protects against bugs in this service, not against someone running code inside it.
 
 ## Using it with AI agents

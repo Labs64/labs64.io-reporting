@@ -15,6 +15,9 @@ management:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,rowPolicies
       show-details: when-authorized
   metrics:
     tags:
@@ -52,3 +55,7 @@ labs64:
     bodies:
       bucket: ${REPORTING_BODIES_BUCKET:}
       region: ${AWS_REGION:}
+    # strict: a table readable without a row policy fails readiness. warn: it is only logged and counted.
+    row-policy-check: ${REPORTING_ROW_POLICY_CHECK:strict}
+    # Again this often after the start: a table empty at the start proves nothing until it holds rows.
+    row-policy-recheck: ${REPORTING_ROW_POLICY_RECHECK:PT5M}
