@@ -54,6 +54,9 @@ public class BodyStore {
     /** Inside a backend's own timeout, so a slow archive answers as an outage here and not as a hung call. */
     private static final Duration API_CALL_TIMEOUT = Duration.ofSeconds(5);
 
+    /** The key the warm-up asks for. Nothing is stored there; a 404 or a 403 for it is the expected answer. */
+    private static final String WARM_UP_KEY = ".reporting-warm-up";
+
     /** How many batches one read looks at. Past this a scope writes over 5,000 events a minute into one folder. */
     private static final int MAX_BATCHES_SEARCHED = 100;
 
@@ -96,6 +99,28 @@ public class BodyStore {
 
     public boolean enabled() {
         return reader != null;
+    }
+
+    /**
+     * Makes the archive client do its first call, so the credentials, the TLS connection and the SDK's classes are
+     * ready before the service takes traffic. Without it the first reads on a new pod pay for all of that inside the
+     * call timeout and answer as an outage (seen on dev: a pod added by the autoscaler under load). The object asked
+     * for need not exist: any answer, or a refusal, has done the work; only the time it took matters.
+     */
+    public void warmUp() {
+        if (!enabled()) {
+            return;
+        }
+        long start = System.nanoTime();
+        try (InputStream ignored = reader.apply(GetObjectRequest.builder().bucket(bucket).key(WARM_UP_KEY).build())) {
+            // An object at this key is as good as none.
+        } catch (S3Exception | IOException e) {
+            // Missing (404) or refused (403) both mean the client has been to S3.
+        } catch (RuntimeException e) {
+            LOG.warn("The archive client could not be warmed up; the first reads may be slow. cause={}", e.toString());
+            return;
+        }
+        LOG.info("Archive client warmed up in {} ms", (System.nanoTime() - start) / 1_000_000);
     }
 
     /** The archived event, or empty when retention removed it or it was never archived. */

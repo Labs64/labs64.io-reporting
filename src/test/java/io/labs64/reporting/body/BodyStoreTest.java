@@ -8,6 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
@@ -142,5 +143,33 @@ class BodyStoreTest {
         // The scope is reduced as the sink reduces it, and a pattern's other characters are literal.
         assertThat(BodyStore.matches(pattern, "acme", "V/1", "tenants/tenant=acme/r/vendor_number=V_1/b")).isTrue();
         assertThat(BodyStore.matches("a.b/*", "acme", "V1", "aXb/c")).isFalse();
+    }
+
+    @Test
+    void warmingUpAsksTheArchiveOnceAndSurvivesEveryAnswer() {
+        AtomicInteger calls = new AtomicInteger();
+        new BodyStore("b", request -> {
+            calls.incrementAndGet();
+            assertThat(request.bucket()).isEqualTo("b");
+            throw NoSuchKeyException.builder().statusCode(404).message("nothing there").build();
+        }).warmUp();
+        new BodyStore("b", request -> {
+            calls.incrementAndGet();
+            throw S3Exception.builder().statusCode(403).message("refused").build();
+        }).warmUp();
+        new BodyStore("b", request -> {
+            calls.incrementAndGet();
+            throw SdkClientException.create("no route");
+        }).warmUp();
+        new BodyStore("b", request -> {
+            calls.incrementAndGet();
+            return new ByteArrayInputStream(new byte[0]);
+        }).warmUp();
+        assertThat(calls).hasValue(4);
+    }
+
+    @Test
+    void warmingUpDoesNothingWithoutAnArchive() {
+        new BodyStore(null, null, null).warmUp();
     }
 }
