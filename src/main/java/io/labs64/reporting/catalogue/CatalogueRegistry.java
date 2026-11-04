@@ -102,12 +102,20 @@ public class CatalogueRegistry {
         Bodies bodies = null;
         if (root.get("bodies") != null) {
             Map<String, Object> b = map(root.get("bodies"), "bodies");
-            if (b.containsKey("keyTemplate") == b.containsKey("prefixTemplate")) {
-                throw new IllegalArgumentException("bodies: needs either 'keyTemplate' or 'prefixTemplate'");
+            long ways = Stream.of("keyTemplate", "prefixTemplate", "keyColumn").filter(b::containsKey).count();
+            if (ways != 1) {
+                throw new IllegalArgumentException("bodies: needs exactly one of 'keyTemplate', 'prefixTemplate', 'keyColumn'");
             }
-            bodies = b.containsKey("keyTemplate")
-                    ? new Bodies(required(b, "group"), required(b, "keyTemplate"), null)
-                    : new Bodies(required(b, "group"), null, required(b, "prefixTemplate"));
+            if (b.containsKey("keyPattern") && !b.containsKey("keyColumn")) {
+                throw new IllegalArgumentException("bodies: 'keyPattern' only applies with 'keyColumn'");
+            }
+            String group = b.get("group") == null ? null : required(b, "group");
+            bodies = new Bodies(group,
+                    b.containsKey("keyTemplate") ? required(b, "keyTemplate") : null,
+                    b.containsKey("prefixTemplate") ? required(b, "prefixTemplate") : null,
+                    b.containsKey("keyColumn") ? expression(b, "keyColumn") : null,
+                    b.containsKey("keyPattern") ? required(b, "keyPattern") : null,
+                    paths(b.get("exclude")));
         }
         return new Catalogue(database, Map.copyOf(metrics), events, List.copyOf(trace), status, bodies,
                 maxHistoryDays(root.get("maxHistoryDays")));
@@ -164,6 +172,25 @@ public class CatalogueRegistry {
         Map<String, String> result = strings(value);
         result.values().forEach(SqlFragment::check);
         return result;
+    }
+
+    /** Dotted paths into an archived event, e.g. {@code extra.planId}: identifiers joined by dots. */
+    private static List<String> paths(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        if (!(value instanceof List<?> list)) {
+            throw new IllegalArgumentException("bodies.exclude must be a list");
+        }
+        List<String> result = new ArrayList<>();
+        for (Object item : list) {
+            String path = String.valueOf(item);
+            for (String part : path.split("\\.", -1)) {
+                requireIdentifier(part);
+            }
+            result.add(path);
+        }
+        return List.copyOf(result);
     }
 
     private static String required(Map<String, Object> map, String key) {

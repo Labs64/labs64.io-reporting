@@ -131,6 +131,17 @@ public class BodyStore {
         });
     }
 
+    /**
+     * The event in the object at this exact key, a batch or a single event, found by its ID without listing anything;
+     * empty when retention removed the object or it doesn't hold the event.
+     */
+    public Optional<JsonNode> findIn(String key, String eventId) {
+        if (!enabled()) {
+            return Optional.empty();
+        }
+        return fromArchive(key, () -> search(key, eventId));
+    }
+
     private Optional<JsonNode> search(String key, String eventId) throws IOException {
         try (BufferedReader lines = new BufferedReader(new InputStreamReader(open(key), StandardCharsets.UTF_8))) {
             for (String line = lines.readLine(); line != null; line = lines.readLine()) {
@@ -173,6 +184,27 @@ public class BodyStore {
     @FunctionalInterface
     private interface ArchiveRead {
         Optional<JsonNode> get() throws IOException;
+    }
+
+    /**
+     * Whether an archive key read from a row fits the catalogue's {@code keyPattern}: {@code {tenant}} and
+     * {@code {scope}} stand for the caller's (the scope reduced as in a key), {@code *} for any text, everything else
+     * is literal. Guards against a row that names another tenant's or scope's object.
+     */
+    public static boolean matches(String pattern, String tenant, String scope, String key) {
+        String safeScope = UNSAFE_KEY_SEGMENT.matcher(scope).replaceAll("_");
+        StringBuilder regex = new StringBuilder();
+        String[] literals = pattern.split("\\*", -1);
+        for (int i = 0; i < literals.length; i++) {
+            if (i > 0) {
+                regex.append(".*");
+            }
+            String literal = literals[i].replace("{tenant}", tenant).replace("{scope}", safeScope);
+            if (!literal.isEmpty()) {
+                regex.append(Pattern.quote(literal));
+            }
+        }
+        return Pattern.compile(regex.toString(), Pattern.DOTALL).matcher(key).matches() && !key.contains("..");
     }
 
     /**

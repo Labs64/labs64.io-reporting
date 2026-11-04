@@ -115,4 +115,32 @@ class BodyStoreTest {
 
         assertThat(new BodyStore("b", request -> null, request -> List.of()).find("f/", "x")).isEmpty();
     }
+
+    @Test
+    void findInReadsExactlyTheNamedObjectAndNeverLists() throws Exception {
+        String batch = "{\"eventId\":\"a\"}\n{\"eventId\":\"b\",\"x\":1}\n";
+        List<String> read = new java.util.ArrayList<>();
+        BodyStore store = new BodyStore("b", request -> {
+            read.add(request.key());
+            return new ByteArrayInputStream(batch.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }, request -> {
+            throw new AssertionError("a key read must not list");
+        });
+
+        assertThat(store.findIn("t/batch-1.jsonl", "b")).get().extracting(n -> n.path("x").asInt()).isEqualTo(1);
+        assertThat(store.findIn("t/batch-1.jsonl", "c")).isEmpty();
+        assertThat(read).containsExactly("t/batch-1.jsonl", "t/batch-1.jsonl");
+    }
+
+    @Test
+    void aKeyPatternAdmitsOnlyTheCallersTenantAndScope() {
+        String pattern = "tenants/tenant={tenant}/*/vendor_number={scope}/*";
+        assertThat(BodyStore.matches(pattern, "acme", "V1", "tenants/tenant=acme/retention=30/vendor_number=V1/y/b.jsonl")).isTrue();
+        assertThat(BodyStore.matches(pattern, "acme", "V1", "tenants/tenant=acme/retention=30/vendor_number=V2/y/b.jsonl")).isFalse();
+        assertThat(BodyStore.matches(pattern, "acme", "V1", "tenants/tenant=globex/retention=30/vendor_number=V1/b")).isFalse();
+        assertThat(BodyStore.matches(pattern, "acme", "V1", "tenants/tenant=acme/x/../vendor_number=V1/b")).isFalse();
+        // The scope is reduced as the sink reduces it, and a pattern's other characters are literal.
+        assertThat(BodyStore.matches(pattern, "acme", "V/1", "tenants/tenant=acme/r/vendor_number=V_1/b")).isTrue();
+        assertThat(BodyStore.matches("a.b/*", "acme", "V1", "aXb/c")).isFalse();
+    }
 }

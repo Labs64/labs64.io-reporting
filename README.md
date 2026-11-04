@@ -71,7 +71,7 @@ Mount your catalogues at `/etc/labs64/reporting/catalogue` (values `volumes`, `v
 - **Metric catalogue**: one YAML file per tenant, validated at start. An invalid file stops the rollout instead of serving wrong numbers.
 - **Metrics API**: a series by range and interval, with up to two dimensions and filters.
 - **Event list and traces**: events paged by cursor, newest first, and every event of one correlation ID.
-- **Bodies from S3**: an event's archived request and response, fetched by a key computed from its row. Optional, limited to a group you name, and every read leaves a log line and a `reporting.body.access` count.
+- **Originals from S3**: an event's archived original, read from the object whose key its row holds (or found by a key computed from the row), minus the fields the catalogue excludes. Optional, can be limited to a group you name, and every read leaves a log line and a `reporting.body.access` count.
 - **Groups and history**: your backend translates a plan into `X-Reporting-Groups` and `X-Reporting-History-Days`. This service knows no plan names; a catalogue's `maxHistoryDays` caps what a backend asserts.
 - **Bounded**: query limits sit on the ClickHouse user, and a store that does not answer gives a `503` with `Retry-After`.
 - **OpenAPI-first**: the [contract](src/main/resources/openapi/openapi-reporting-v1.yaml) generates the server interfaces and the gateway policies.

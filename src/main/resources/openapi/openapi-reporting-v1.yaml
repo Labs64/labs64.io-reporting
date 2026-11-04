@@ -329,10 +329,16 @@ components:
     EventBody:
       type: object
       properties:
-        requestBody: {type: string}
-        requestBodyTruncated: {type: boolean}
-        responseBody: {type: string}
-        responseBodyTruncated: {type: boolean}
+        event:
+          type: object
+          additionalProperties: true
+          description: >-
+            The archived event as it was stored, without the fields the tenant's catalogue excludes. Present when the
+            catalogue names the column that holds the event's archive key (bodies.keyColumn).
+        requestBody: {type: string, deprecated: true, description: Use event.}
+        requestBodyTruncated: {type: boolean, deprecated: true, description: Use event.}
+        responseBody: {type: string, deprecated: true, description: Use event.}
+        responseBodyTruncated: {type: boolean, deprecated: true, description: Use event.}
     Status:
       type: object
       properties:

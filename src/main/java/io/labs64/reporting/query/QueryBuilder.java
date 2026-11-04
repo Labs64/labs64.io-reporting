@@ -101,6 +101,29 @@ public final class QueryBuilder {
         return new SqlQuery(sql.toString(), parameters);
     }
 
+    /**
+     * The archive key of one event, read from {@code keyColumn} of the event source, under the same scope and history
+     * limit as {@link #event}: no row, no key, so another scope's object can never be named.
+     */
+    public static SqlQuery archiveKey(EventSource source, String keyColumn, String scope, String eventId,
+            OffsetDateTime earliest) {
+        Map<String, String> parameters = new LinkedHashMap<>();
+        parameters.put("scope", scope);
+        parameters.put("eventId", eventId);
+        StringBuilder sql = new StringBuilder("SELECT toString(").append(keyColumn).append(") AS archiveKey FROM ")
+                .append(source.table());
+        if (source.useFinal()) {
+            sql.append(" FINAL");
+        }
+        sql.append(" WHERE ").append(source.scopeColumn()).append(" = {scope:String}");
+        if (source.where() != null) {
+            sql.append(" AND (").append(source.where()).append(")");
+        }
+        appendEarliest(sql, parameters, source, earliest);
+        sql.append(" AND toString(").append(source.id()).append(") = {eventId:String} LIMIT 1");
+        return new SqlQuery(sql.toString(), parameters);
+    }
+
     /** @param earliest the start of the caller's history; null: all of it */
     public static SqlQuery trace(EventSource source, String scope, String correlationId, int limit,
             OffsetDateTime earliest) {
