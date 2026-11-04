@@ -14,10 +14,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.labs64.reporting.body.BodyStore;
 import io.labs64.reporting.caller.Caller;
@@ -44,6 +47,8 @@ public class ReportingService {
     static final int MAX_TRACE_EVENTS = 200;
 
     /** ClickHouse's text for a time, with or without a time of day and fractions. */
+    private static final Logger LOG = LoggerFactory.getLogger(ReportingService.class);
+    private static final ObjectMapper JSON = new ObjectMapper();
     private static final int MIN_YEAR = 1900;
     private static final int MAX_YEAR = 2299;
 
@@ -154,8 +159,12 @@ public class ReportingService {
         if (catalogue.bodies() == null || !bodies.enabled()) {
             throw ReportingException.notFound("This deployment keeps no bodies.");
         }
-        if (!caller.groups().contains(catalogue.bodies().group())) {
+        Catalogue.Bodies where = catalogue.bodies();
+        if (where.group() != null && !caller.groups().contains(where.group())) {
             throw ReportingException.forbidden("Bodies are not part of the caller's plan.");
+        }
+        if (where.keyColumn() != null) {
+            return originalByKey(caller, catalogue, eventId.toString());
         }
         // The row comes through the scope's row policy: no row, no key, so another scope's object can't be named.
         Map<String, Object> row = row(caller, eventId.toString());
@@ -163,7 +172,6 @@ public class ReportingService {
         if (received == null) {
             throw ReportingException.notFound("Unknown event.");
         }
-        Catalogue.Bodies where = catalogue.bodies();
         String template = where.prefixTemplate() != null ? where.prefixTemplate() : where.keyTemplate();
         String key = BodyStore.key(template, caller.tenant(), caller.scope(), eventId.toString(),
                 storedTime(received.toString()));
@@ -176,6 +184,54 @@ public class ReportingService {
         body.setRequestBodyTruncated(extra.path("request").path("bodyTruncated").asBoolean(false));
         body.setResponseBodyTruncated(extra.path("response").path("bodyTruncated").asBoolean(false));
         return body;
+    }
+
+    /**
+     * The archived original whose key the event's own row holds: one read of that object, no listing. The row comes
+     * through the scope's row policy and the caller's history, so another scope's object can't be named; the key is
+     * also checked against the catalogue's {@code keyPattern} before anything is read.
+     */
+    private EventBody originalByKey(Caller caller, Catalogue catalogue, String eventId) {
+        Catalogue.Bodies where = catalogue.bodies();
+        List<Map<String, Object>> rows = clickHouse.query(catalogue.database(), caller.scope(),
+                QueryBuilder.archiveKey(events(catalogue), where.keyColumn(), caller.scope(), eventId,
+                        earliest(caller, catalogue)));
+        if (rows.isEmpty()) {
+            throw ReportingException.notFound("Unknown event.");
+        }
+        Object value = rows.get(0).get("archiveKey");
+        String key = value == null ? "" : value.toString();
+        if (key.isBlank()) {
+            // A row written before the archive key existed, or by a pipeline that keeps no original.
+            throw ReportingException.notFound("The original of this event is no longer kept.");
+        }
+        if (where.keyPattern() != null && !BodyStore.matches(where.keyPattern(), caller.tenant(), caller.scope(), key)) {
+            LOG.warn("An archive key outside the caller's tenant and scope was refused. tenant={} eventId={}",
+                    caller.tenant(), eventId);
+            throw ReportingException.notFound("The original of this event is no longer kept.");
+        }
+        JsonNode event = bodies.findIn(key, eventId)
+                .orElseThrow(() -> ReportingException.notFound("The original of this event is no longer kept."));
+        EventBody body = new EventBody();
+        body.setEvent(withoutExcluded(event, where.exclude()));
+        return body;
+    }
+
+    /** The event as plain maps and lists, without the excluded dotted paths. Nothing else is changed. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> withoutExcluded(JsonNode event, List<String> exclude) {
+        Map<String, Object> copy = JSON.convertValue(event, Map.class);
+        for (String path : exclude) {
+            String[] parts = path.split("\\.");
+            Map<String, Object> node = copy;
+            for (int i = 0; i < parts.length - 1 && node != null; i++) {
+                node = node.get(parts[i]) instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
+            }
+            if (node != null) {
+                node.remove(parts[parts.length - 1]);
+            }
+        }
+        return copy;
     }
 
     public Status getStatus(Caller caller) {

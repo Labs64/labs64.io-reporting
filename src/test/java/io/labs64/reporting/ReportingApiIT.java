@@ -136,6 +136,25 @@ class ReportingApiIT {
         assertThat(b.get(0).get("c")).isEqualTo(1);
     }
 
+    /** The one query of the archive-key read, run as the reader: valid SQL, the caller's row only, nothing across scopes. */
+    @Test
+    void theArchiveKeyOfAnEventIsReadOnlyForItsOwnScope() {
+        ClickHouseClient client = new ClickHouseClient(new ReportingProperties.ClickHouse(clickHouseUrl(), "reporting",
+                "reader", java.time.Duration.ofSeconds(2), java.time.Duration.ofSeconds(6), 4, java.time.Duration.ofMillis(500)));
+        var source = new io.labs64.reporting.catalogue.Catalogue.EventSource("events", "calls", "customer", "event_time",
+                "event_id", "correlation_id", false, null, Map.of("eventId", "toString(event_id)"), Map.of());
+        String keyColumn = "concat('t/', customer, '/', toString(event_id))";
+
+        List<Map<String, Object>> own = client.query("demo", "A",
+                io.labs64.reporting.query.QueryBuilder.archiveKey(source, keyColumn, "A", "00000000-0000-0000-0000-00000000000a", null));
+        List<Map<String, Object>> other = client.query("demo", "A",
+                io.labs64.reporting.query.QueryBuilder.archiveKey(source, keyColumn, "A", "00000000-0000-0000-0000-00000000000d", null));
+
+        assertThat(own).hasSize(1);
+        assertThat(own.get(0).get("archiveKey")).isEqualTo("t/A/00000000-0000-0000-0000-00000000000a");
+        assertThat(other).as("B's event is invisible to A").isEmpty();
+    }
+
     @Test
     void aMetricCountsOnlyTheCallersScopePerDay() throws Exception {
         JsonNode series = ok(post("/metrics/query", "A", "base", null, "{\"metric\":\"calls.allTime\"," + RANGE + "}"));

@@ -49,6 +49,33 @@ class CatalogueRegistryTest {
     }
 
     @Test
+    void bodiesCanNameTheColumnThatHoldsTheArchiveKeyWithoutAGroup(@TempDir Path directory) throws Exception {
+        Files.writeString(directory.resolve("key.yaml"), WITHOUT_BODIES + "bodies: {keyColumn: archive_key, "
+                + "keyPattern: 'tenants/tenant={tenant}/*', exclude: [tenantId, extra.planId]}\n");
+
+        var bodies = CatalogueRegistry.load(directory).get("key").bodies();
+        assertThat(bodies.keyColumn()).isEqualTo("archive_key");
+        assertThat(bodies.group()).isNull();
+        assertThat(bodies.keyPattern()).isEqualTo("tenants/tenant={tenant}/*");
+        assertThat(bodies.exclude()).containsExactly("tenantId", "extra.planId");
+    }
+
+    @Test
+    void aWrongKeyColumnSetupStopsTheStart(@TempDir Path directory) throws Exception {
+        for (String bodies : List.of(
+                "{keyColumn: archive_key, prefixTemplate: p/}",          // two ways at once
+                "{keyTemplate: k, keyPattern: 'x/*'}",                   // a pattern without a key column
+                "{keyColumn: 'archive_key; DROP TABLE x'}",              // not one expression
+                "{keyColumn: archive_key, exclude: ['extra..x']}",       // not a dotted path
+                "{keyColumn: archive_key, exclude: tenantId}")) {        // not a list
+            Path dir = Files.createTempDirectory(directory, "c");
+            Files.writeString(dir.resolve("bad.yaml"), WITHOUT_BODIES + "bodies: " + bodies + "\n");
+            assertThatThrownBy(() -> CatalogueRegistry.load(dir)).as(bodies).isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("bad.yaml");
+        }
+    }
+
+    @Test
     void bodiesWithBothOrNeitherStopTheStart(@TempDir Path directory) throws Exception {
         Files.writeString(directory.resolve("both.yaml"), WITHOUT_BODIES + "bodies: {group: g, keyTemplate: k, prefixTemplate: p/}\n");
         assertThatThrownBy(() -> CatalogueRegistry.load(directory)).isInstanceOf(IllegalStateException.class)

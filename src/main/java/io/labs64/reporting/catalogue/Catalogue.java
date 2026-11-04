@@ -30,9 +30,19 @@ public record Catalogue(String database, Map<String, Metric> metrics, EventSourc
     }
 
     /**
-     * Where one event's archived bodies are, either an object per event or a folder of batches to search. Null: this
-     * tenant has none.
+     * Where one event's archived original is: an object per event ({@code keyTemplate}), a folder of batches to search
+     * ({@code prefixTemplate}), or the object whose key a column of the event's row holds ({@code keyColumn}). Null:
+     * this tenant has none.
+     *
+     * @param group      the group a caller needs to read them; null: every caller of the tenant
+     * @param keyPattern with {@code keyColumn}: a key read from a row must match it ({tenant}, {scope}, * for any text)
+     * @param exclude    dotted paths of the archived event that are never returned
      */
-    public record Bodies(String group, String keyTemplate, String prefixTemplate) {
+    public record Bodies(String group, String keyTemplate, String prefixTemplate, String keyColumn, String keyPattern,
+            List<String> exclude) {
+
+        public Bodies(String group, String keyTemplate, String prefixTemplate) {
+            this(group, keyTemplate, prefixTemplate, null, null, List.of());
+        }
     }
 }

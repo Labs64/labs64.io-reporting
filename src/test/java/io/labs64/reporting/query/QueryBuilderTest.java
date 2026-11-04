@@ -94,4 +94,20 @@ class QueryBuilderTest {
         org.assertj.core.api.Assertions.assertThat(QueryBuilder.event(source, "A", "id", null).sql())
                 .doesNotContain("earliest");
     }
+
+    @Test
+    void theArchiveKeyIsReadUnderTheSameScopeHistoryAndFinalAsTheEvent() {
+        var source = new io.labs64.reporting.catalogue.Catalogue.EventSource("events", "calls", "customer", "event_time",
+                "event_id", "correlation_id", true, "kind = 'call'", java.util.Map.of("eventId", "toString(event_id)"),
+                java.util.Map.of());
+        var earliest = java.time.OffsetDateTime.parse("2026-01-01T00:00:00Z");
+
+        var query = QueryBuilder.archiveKey(source, "archive_key", "A", "e1", earliest);
+
+        org.assertj.core.api.Assertions.assertThat(query.sql()).isEqualTo(
+                "SELECT toString(archive_key) AS archiveKey FROM calls FINAL WHERE customer = {scope:String}"
+                        + " AND (kind = 'call') AND (event_time) >= {earliest:DateTime64(3, 'UTC')}"
+                        + " AND toString(event_id) = {eventId:String} LIMIT 1");
+        org.assertj.core.api.Assertions.assertThat(query.parameters()).containsEntry("scope", "A").containsEntry("eventId", "e1");
+    }
 }

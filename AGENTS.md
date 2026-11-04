@@ -36,7 +36,7 @@ Reads what AuditFlow's sinks wrote; never writes and owns no database. Reached t
 | `events` | The event list: `table`, `scopeColumn`, `time`, `id`, `correlation`, `columns` (with `eventId`, `time`, `received`), `filters` |
 | `trace` | The sources a trace reads; default `events` |
 | `status` | `table`, `scopeColumn`, `received` |
-| `bodies` | `group`, and either `prefixTemplate`: the folder a batching S3 sink writes one event's batch under, searched by event ID, its finest part being the receipt minute; or `keyTemplate`: the object an unbatched sink writes for one event |
+| `bodies` | Exactly one of: `keyColumn`, an expression over the event table that holds the key of the object the event is archived in (e.g. from an AuditFlow pipeline step), read with one GET and no listing; `prefixTemplate`, the folder a batching S3 sink writes one event's batch under, searched by event ID, its finest part being the receipt minute; `keyTemplate`, the object an unbatched sink writes for one event. Optional: `group` (without it every caller of the tenant may read), `keyPattern` with `keyColumn` (`{tenant}`, `{scope}`, `*`: a key from a row must match it), `exclude` (dotted paths of the archived event never returned). With `keyColumn` the answer's `event` is the archived event minus `exclude` |
 
 Each SQL fragment must stay one expression over the table's own columns (`SqlFragment`): no `;`, comments or unbalanced
 parentheses, no clause or statement keywords, no functions that reach outside the table, and `IN` only with a list. A
