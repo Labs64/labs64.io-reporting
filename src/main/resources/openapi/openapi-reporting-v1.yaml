@@ -121,7 +121,7 @@ paths:
     post:
       operationId: getEventBody
       tags: [Reporting]
-      summary: The request and response bodies of one event, from the archive
+      summary: One event as archived, request and response bodies included
       x-labs64:
         auth:
           tenant: true
@@ -137,7 +137,7 @@ paths:
             schema: {$ref: "#/components/schemas/EventRef"}
       responses:
         "200":
-          description: The bodies
+          description: The archived event (`event`); the deprecated body fields are filled only by catalogues that find bodies by folder
           content:
             application/json:
               schema: {$ref: "#/components/schemas/EventBody"}
@@ -215,7 +215,7 @@ components:
       name: X-Reporting-History-Days
       in: header
       required: false
-      description: How many days back this customer may see, for metrics without full history.
+      description: How many days back this customer may see. Applies to metrics without full history, event search, event get, traces and the archived event.
       schema: {type: integer, format: int32, minimum: 1}
   responses:
     Error:
