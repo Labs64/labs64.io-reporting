@@ -80,7 +80,7 @@ Mount your catalogues at `/etc/labs64/reporting/catalogue` (values `volumes`, `v
 ## Architecture
 
 ```text
- your backend ──POST + token + X-Reporting-Scope──▶ API Gateway ──▶ Reporting ──reader user + row policy──▶ ClickHouse
+ your backend ──POST + token + X-Reporting-Scope──▶ Auth Gateway ─▶ Reporting ──reader user + row policy──▶ ClickHouse
  (authenticates the customer,                       (token, scope)      │
   translates its plan)                                                  └──read only──▶ S3 (bodies)
 
@@ -126,7 +126,7 @@ metrics:
 
 ## Before you go to production
 
-- **Put it behind the API Gateway.** The service trusts the `X-Auth-*` headers it receives. Only a caller with `reporting:read-delegated` may name a scope, so give that role to your backend alone.
+- **Put it behind the Auth Gateway.** The service trusts the `X-Auth-*` headers it receives. Only a caller with `reporting:read-delegated` may name a scope, so give that role to your backend alone.
 - **Give the reader a row policy on every table it can read.** `readonly = 2` and `SQL_scope` make it work. The service proves it at the start and every few minutes by asking each catalogue table for a scope nobody has: a row back fails readiness, for every tenant of the pod, and names the table. An empty table can't be proven until it holds rows.
 - **Limit the reader in ClickHouse.** Execution time, result rows and memory belong in its settings profile. The service caps no range or bucket count: the result-row limit measures what a query really returns, and answers a `400`.
 - **Close the way around the gateway.** The chart's `networkPolicy.enabled` is off by default; turn it on.

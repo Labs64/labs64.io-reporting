@@ -5,7 +5,7 @@ archived bodies from S3. A tenant's backend calls it on behalf of one of its cus
 
 ## Ecosystem role
 
-Reads what AuditFlow's sinks wrote; never writes and owns no database. Reached through the API Gateway on
+Reads what AuditFlow's sinks wrote; never writes and owns no database. Reached through the Auth Gateway on
 `/reporting/api/v1`. The chart is `charts/reporting` in labs64.io-helm-charts; a release is a GitHub Release whose tag
 `X.Y.Z` becomes the jar, image and chart `appVersion` (`labs64io-docker-publish.yml` opens the chart PR).
 
