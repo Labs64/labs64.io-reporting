@@ -65,9 +65,11 @@ class CatalogueRegistryTest {
         for (String bodies : List.of(
                 "{keyColumn: archive_key, prefixTemplate: p/}",          // two ways at once
                 "{keyTemplate: k, keyPattern: 'x/*'}",                   // a pattern without a key column
-                "{keyColumn: 'archive_key; DROP TABLE x'}",              // not one expression
-                "{keyColumn: archive_key, exclude: ['extra..x']}",       // not a dotted path
-                "{keyColumn: archive_key, exclude: tenantId}")) {        // not a list
+                "{keyColumn: archive_key}",                              // no pattern for the keys a row may name
+                "{keyTemplate: k, exclude: [tenantId]}",                 // an exclusion where nothing applies it
+                "{keyColumn: 'archive_key; DROP TABLE x', keyPattern: 'x/*'}",            // not one expression
+                "{keyColumn: archive_key, keyPattern: 'x/*', exclude: ['extra..x']}",     // not a dotted path
+                "{keyColumn: archive_key, keyPattern: 'x/*', exclude: tenantId}")) {      // not a list
             Path dir = Files.createTempDirectory(directory, "c");
             Files.writeString(dir.resolve("bad.yaml"), WITHOUT_BODIES + "bodies: " + bodies + "\n");
             assertThatThrownBy(() -> CatalogueRegistry.load(dir)).as(bodies).isInstanceOf(IllegalStateException.class)

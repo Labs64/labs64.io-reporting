@@ -102,7 +102,60 @@ class ReportingServiceBodiesTest {
         Map<String, Object> extra = (Map<String, Object>) event.get("extra");
         assertThat(extra).doesNotContainKey("plan");
         assertThat(((Map<String, Object>) extra.get("request")).get("body")).isEqualTo("x");
+        assertThat(body.getRequestBody()).as("the deprecated field is still filled").isEqualTo("x");
+        assertThat(body.getResponseBody()).isNull();
         org.mockito.Mockito.verify(bodies, org.mockito.Mockito.never()).find(any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void anExcludedPathThroughAListIsRemovedFromEveryEntryAndFromTheDeprecatedFields() throws Exception {
+        BodyStore bodies = mock(BodyStore.class);
+        when(bodies.enabled()).thenReturn(true);
+        when(bodies.findIn(KEY, EVENT.toString())).thenReturn(Optional.of(new ObjectMapper().readTree("""
+                {"eventId":"e","extra":{"lines":[{"price":1,"secret":"a"},{"price":2,"secret":"b"}],
+                 "request":{"body":"x"}}}""")));
+        Map<String, Object> excluding = new java.util.HashMap<>(BY_KEY);
+        excluding.put("exclude", List.of("extra.lines.secret", "extra.request.body", "extra.missing.x"));
+
+        EventBody body = service(byKey(excluding), rowWithKey(KEY), bodies)
+                .getBody(new Caller("demo", "A", Set.of("base"), null), EVENT);
+
+        Map<String, Object> extra = (Map<String, Object>) ((Map<String, Object>) body.getEvent()).get("extra");
+        assertThat((List<Map<String, Object>>) extra.get("lines")).containsExactly(Map.of("price", 1), Map.of("price", 2));
+        assertThat(body.getRequestBody()).isNull();
+    }
+
+    @Test
+    void aScopeGetsOnlyItsShareOfArchiveReads() throws Exception {
+        java.util.concurrent.CountDownLatch reading = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        BodyStore slow = mock(BodyStore.class);
+        when(slow.enabled()).thenReturn(true);
+        when(slow.findIn(any(), any())).thenAnswer(call -> {
+            reading.countDown();
+            release.await();
+            return Optional.of(new ObjectMapper().readTree(STORED));
+        });
+        ReportingService service = new ReportingService(new CatalogueRegistry(Map.of("demo", byKey(BY_KEY))),
+                rowWithKey(KEY), slow, java.time.Clock.systemUTC(),
+                new io.labs64.reporting.clickhouse.ScopeLimiter(1, java.time.Duration.ofMillis(10)));
+        Caller caller = new Caller("demo", "A", Set.of("base"), null);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            java.util.concurrent.Future<EventBody> first = pool.submit(() -> service.getBody(caller, EVENT));
+            reading.await();
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.getBody(caller, EVENT))
+                    .isInstanceOfSatisfying(ReportingException.class,
+                            e -> assertThat(e.status().value()).isEqualTo(429));
+
+            release.countDown();
+            assertThat(first.get().getEvent()).isNotNull();
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
     }
 
     @Test

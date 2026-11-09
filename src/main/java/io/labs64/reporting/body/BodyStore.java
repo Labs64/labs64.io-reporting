@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -59,6 +60,9 @@ public class BodyStore {
 
     /** How many batches one read looks at. Past this a scope writes over 5,000 events a minute into one folder. */
     private static final int MAX_BATCHES_SEARCHED = 100;
+
+    /** How long one folder search may take in all; each read has its own timeout, and a hundred of them add up. */
+    private static final Duration SEARCH_TIMEOUT = Duration.ofSeconds(15);
 
     private final String bucket;
     private final Function<GetObjectRequest, InputStream> reader;
@@ -146,7 +150,11 @@ public class BodyStore {
             if (batches.size() == MAX_BATCHES_SEARCHED) {
                 LOG.warn("A folder of batches has more than a read searches; a body may read as not kept. folder={}", folder);
             }
+            long deadline = System.nanoTime() + SEARCH_TIMEOUT.toNanos();
             for (String batch : batches) {
+                if (System.nanoTime() - deadline > 0) {
+                    throw new IOException("the search of " + batches.size() + " batches took too long");
+                }
                 Optional<JsonNode> event = search(batch, eventId);
                 if (event.isPresent()) {
                     return event;
@@ -172,8 +180,15 @@ public class BodyStore {
             for (String line = lines.readLine(); line != null; line = lines.readLine()) {
                 // Parsed only when it can match. A body may quote another event's ID, so the field decides.
                 if (line.contains(eventId)) {
-                    JsonNode event = JSON.readTree(line);
-                    if (eventId.equals(event.path("eventId").asText())) {
+                    JsonNode event;
+                    try {
+                        event = JSON.readTree(line);
+                    } catch (JsonProcessingException e) {
+                        // One broken line is not the archive failing: the event may be on another line.
+                        LOG.warn("An archived line could not be read and was skipped. key={}", key);
+                        continue;
+                    }
+                    if (event != null && eventId.equals(event.path("eventId").asText())) {
                         return Optional.of(event);
                     }
                 }
@@ -213,8 +228,10 @@ public class BodyStore {
 
     /**
      * Whether an archive key read from a row fits the catalogue's {@code keyPattern}: {@code {tenant}} and
-     * {@code {scope}} stand for the caller's (the scope reduced as in a key), {@code *} for any text, everything else
-     * is literal. Guards against a row that names another tenant's or scope's object.
+     * {@code {scope}} stand for the caller's (the scope reduced as in a key), everything else is literal. A {@code *}
+     * stands for text within one path segment; only the last one, at the very end, also crosses {@code /}, so the
+     * tenant and scope segments can't be skipped over. Guards against a row that names another tenant's or scope's
+     * object.
      */
     public static boolean matches(String pattern, String tenant, String scope, String key) {
         String safeScope = UNSAFE_KEY_SEGMENT.matcher(scope).replaceAll("_");
@@ -222,7 +239,7 @@ public class BodyStore {
         String[] literals = pattern.split("\\*", -1);
         for (int i = 0; i < literals.length; i++) {
             if (i > 0) {
-                regex.append(".*");
+                regex.append(i == literals.length - 1 && literals[i].isEmpty() ? ".*" : "[^/]*");
             }
             String literal = literals[i].replace("{tenant}", tenant).replace("{scope}", safeScope);
             if (!literal.isEmpty()) {

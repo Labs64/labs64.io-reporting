@@ -36,14 +36,14 @@ Reads what AuditFlow's sinks wrote; never writes and owns no database. Reached t
 | `events` | The event list: `table`, `scopeColumn`, `time`, `id`, `correlation`, `columns` (with `eventId`, `time`, `received`), `filters` |
 | `trace` | The sources a trace reads; default `events` |
 | `status` | `table`, `scopeColumn`, `received` |
-| `bodies` | Exactly one of: `keyColumn`, an expression over the event table that holds the key of the object the event is archived in (e.g. from an AuditFlow pipeline step), read with one GET and no listing; `prefixTemplate`, the folder a batching S3 sink writes one event's batch under, searched by event ID, its finest part being the receipt minute; `keyTemplate`, the object an unbatched sink writes for one event. Optional: `group` (without it every caller of the tenant may read), `keyPattern` with `keyColumn` (`{tenant}`, `{scope}`, `*`: a key from a row must match it), `exclude` (dotted paths of the archived event never returned). With `keyColumn` the answer's `event` is the archived event minus `exclude` |
+| `bodies` | Exactly one of: `keyColumn`, an expression over the event table that holds the key of the object the event is archived in (e.g. from an AuditFlow pipeline step), read with one GET and no listing; `prefixTemplate`, the folder a batching S3 sink writes one event's batch under, searched by event ID, its finest part being the receipt minute; `keyTemplate`, the object an unbatched sink writes for one event. With `keyColumn`, `keyPattern` is required: a key from a row must match it (`{tenant}`, `{scope}`; `*` is text within one path segment, and only a `*` at the very end also crosses `/`; a pattern without `{scope}` is logged at start, since then only the row policy keeps a caller to its own originals). Optional: `group` (without it every caller of the tenant may read) and, with `keyColumn` only, `exclude` (dotted paths of the archived event never returned; a list on the path stands for each of its entries). With `keyColumn` the answer's `event` is the archived event minus `exclude`. Archive reads take a scope's share like queries do (`maxQueriesPerScope`), in a count of their own |
 
 Each SQL fragment must stay one expression over the table's own columns (`SqlFragment`): no `;`, comments or unbalanced
 parentheses, no clause or statement keywords, no functions that reach outside the table, and `IN` only with a list. A
 column named like a keyword needs backticks.
 
 `RowPolicyCheck` proves the row policies by behaviour: as the reader, each catalogue table is asked for a scope nobody
-has. Don't replace it with a look at the policy metadata: a view is protected by the policy on its base table.
+has. A probe the store does not answer changes nothing: a table found unprotected stays so until a probe proves otherwise. Don't replace it with a look at the policy metadata: a view is protected by the policy on its base table.
 
 ## Build and test
 

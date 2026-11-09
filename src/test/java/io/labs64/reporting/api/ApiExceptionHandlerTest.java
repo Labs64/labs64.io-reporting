@@ -55,6 +55,17 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void aHeaderOfTheWrongTypeAnswersWithTheApisOwnError() {
+        ResponseEntity<Error> response = new ApiExceptionHandler().invalid(
+                new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException("abc", Integer.class,
+                        "X-Reporting-History-Days", null, new NumberFormatException("abc")));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().getCode()).isEqualTo("INVALID_REQUEST");
+        assertThat(response.getBody().getMessage()).doesNotContain("abc");
+    }
+
+    @Test
     void anOutageWithoutACauseStillLogsOneLine() {
         new ApiExceptionHandler().reporting(ReportingException.unavailable("The report store could not answer.", null));
 

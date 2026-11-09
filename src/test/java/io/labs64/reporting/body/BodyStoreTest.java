@@ -118,6 +118,15 @@ class BodyStoreTest {
     }
 
     @Test
+    void aBrokenLineIsSkippedAndTheEventStillFound() {
+        String batch = "{\"eventId\":\"b\",\"x\":\n{\"note\":\"b\",\"eventId\":\"a\"}\n{\"eventId\":\"b\",\"x\":1}\n";
+        BodyStore store = new BodyStore("b",
+                request -> new ByteArrayInputStream(batch.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        assertThat(store.findIn("t/batch-1.jsonl", "b")).get().extracting(n -> n.path("x").asInt()).isEqualTo(1);
+    }
+
+    @Test
     void findInReadsExactlyTheNamedObjectAndNeverLists() throws Exception {
         String batch = "{\"eventId\":\"a\"}\n{\"eventId\":\"b\",\"x\":1}\n";
         List<String> read = new java.util.ArrayList<>();
@@ -143,6 +152,11 @@ class BodyStoreTest {
         // The scope is reduced as the sink reduces it, and a pattern's other characters are literal.
         assertThat(BodyStore.matches(pattern, "acme", "V/1", "tenants/tenant=acme/r/vendor_number=V_1/b")).isTrue();
         assertThat(BodyStore.matches("a.b/*", "acme", "V1", "aXb/c")).isFalse();
+        // A '*' before the end stays within its segment: the scope's own segment can't be skipped over.
+        assertThat(BodyStore.matches(pattern, "acme", "V1",
+                "tenants/tenant=acme/retention=30/vendor_number=V2/vendor_number=V1/b")).isFalse();
+        assertThat(BodyStore.matches("t/*/s={scope}/*.gz", "acme", "V1", "t/x/s=V1/a/b.gz")).isFalse();
+        assertThat(BodyStore.matches("t/*/s={scope}/*.gz", "acme", "V1", "t/x/s=V1/b.gz")).isTrue();
     }
 
     @Test
