@@ -29,6 +29,7 @@ import io.labs64.reporting.catalogue.Catalogue.EventSource;
 import io.labs64.reporting.catalogue.Catalogue.Metric;
 import io.labs64.reporting.catalogue.CatalogueRegistry;
 import io.labs64.reporting.clickhouse.ClickHouseClient;
+import io.labs64.reporting.clickhouse.ScopeLimiter;
 import io.labs64.reporting.model.EventBody;
 import io.labs64.reporting.model.EventPage;
 import io.labs64.reporting.model.EventSearch;
@@ -63,16 +64,31 @@ public class ReportingService {
     private final BodyStore bodies;
     private final Clock clock;
 
+    /** A read of the archive can take seconds: a scope gets the same share of them as of the queries. */
+    private final ScopeLimiter archiveReads;
+
     @Autowired
-    public ReportingService(CatalogueRegistry catalogues, ClickHouseClient clickHouse, BodyStore bodies) {
+    public ReportingService(CatalogueRegistry catalogues, ClickHouseClient clickHouse, BodyStore bodies,
+            ReportingProperties properties) {
+        this(catalogues, clickHouse, bodies, Clock.systemUTC(),
+                new ScopeLimiter(properties.clickhouse().maxQueriesPerScope(), properties.clickhouse().scopeWait()));
+    }
+
+    ReportingService(CatalogueRegistry catalogues, ClickHouseClient clickHouse, BodyStore bodies) {
         this(catalogues, clickHouse, bodies, Clock.systemUTC());
     }
 
     ReportingService(CatalogueRegistry catalogues, ClickHouseClient clickHouse, BodyStore bodies, Clock clock) {
+        this(catalogues, clickHouse, bodies, clock, new ScopeLimiter(4, java.time.Duration.ofMillis(500)));
+    }
+
+    ReportingService(CatalogueRegistry catalogues, ClickHouseClient clickHouse, BodyStore bodies, Clock clock,
+            ScopeLimiter archiveReads) {
         this.catalogues = catalogues;
         this.clickHouse = clickHouse;
         this.bodies = bodies;
         this.clock = clock;
+        this.archiveReads = archiveReads;
     }
 
     public MetricList listMetrics(Caller caller) {
@@ -175,7 +191,8 @@ public class ReportingService {
         String template = where.prefixTemplate() != null ? where.prefixTemplate() : where.keyTemplate();
         String key = BodyStore.key(template, caller.tenant(), caller.scope(), eventId.toString(),
                 storedTime(received.toString()));
-        JsonNode event = (where.prefixTemplate() != null ? bodies.find(key, eventId.toString()) : bodies.read(key))
+        JsonNode event = archiveReads.run(caller.scope(),
+                () -> where.prefixTemplate() != null ? bodies.find(key, eventId.toString()) : bodies.read(key))
                 .orElseThrow(() -> ReportingException.notFound("The bodies of this event are no longer kept."));
         JsonNode extra = event.path("extra");
         EventBody body = new EventBody();
@@ -210,28 +227,44 @@ public class ReportingService {
                     caller.tenant(), eventId);
             throw ReportingException.notFound("The original of this event is no longer kept.");
         }
-        JsonNode event = bodies.findIn(key, eventId)
+        JsonNode event = archiveReads.run(caller.scope(), () -> bodies.findIn(key, eventId))
                 .orElseThrow(() -> ReportingException.notFound("The original of this event is no longer kept."));
+        Map<String, Object> original = withoutExcluded(event, where.exclude());
         EventBody body = new EventBody();
-        body.setEvent(withoutExcluded(event, where.exclude()));
+        body.setEvent(original);
+        // The deprecated fields, from the same copy: what the catalogue excludes stays out of them too.
+        JsonNode extra = JSON.valueToTree(original).path("extra");
+        body.setRequestBody(text(extra.path("request").path("body")));
+        body.setResponseBody(text(extra.path("response").path("body")));
+        body.setRequestBodyTruncated(extra.path("request").path("bodyTruncated").asBoolean(false));
+        body.setResponseBodyTruncated(extra.path("response").path("bodyTruncated").asBoolean(false));
         return body;
     }
 
-    /** The event as plain maps and lists, without the excluded dotted paths. Nothing else is changed. */
+    /**
+     * The event as plain maps and lists, without the excluded dotted paths. A list on a path stands for each of its
+     * entries, so a path through one still removes the field. Nothing else is changed.
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> withoutExcluded(JsonNode event, List<String> exclude) {
         Map<String, Object> copy = JSON.convertValue(event, Map.class);
         for (String path : exclude) {
-            String[] parts = path.split("\\.");
-            Map<String, Object> node = copy;
-            for (int i = 0; i < parts.length - 1 && node != null; i++) {
-                node = node.get(parts[i]) instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
-            }
-            if (node != null) {
-                node.remove(parts[parts.length - 1]);
-            }
+            remove(copy, path.split("\\."), 0);
         }
         return copy;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void remove(Object node, String[] parts, int at) {
+        if (node instanceof List<?> entries) {
+            entries.forEach(entry -> remove(entry, parts, at));
+        } else if (node instanceof Map<?, ?> map) {
+            if (at == parts.length - 1) {
+                ((Map<String, Object>) map).remove(parts[at]);
+            } else {
+                remove(map.get(parts[at]), parts, at + 1);
+            }
+        }
     }
 
     public Status getStatus(Caller caller) {

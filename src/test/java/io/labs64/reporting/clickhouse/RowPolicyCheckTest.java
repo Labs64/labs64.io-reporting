@@ -104,6 +104,21 @@ class RowPolicyCheckTest {
     }
 
     @Test
+    void aStoreThatDoesNotAnswerDoesNotClearAFinding() {
+        when(clickHouse.query(any(), any(), any())).thenReturn(List.of());
+        aRowComesBackFrom("trace_table");
+        RowPolicyCheck check = check(ReportingProperties.RowPolicyCheck.STRICT);
+        check.check();
+
+        org.mockito.Mockito.reset(clickHouse);
+        when(clickHouse.query(any(), any(), any())).thenThrow(ReportingException.unavailable("down", null));
+        check.check();
+
+        assertThat(check.health().getStatus()).isEqualTo(Status.OUT_OF_SERVICE);
+        assertThat(check.health().getDetails().get("unprotectedTables").toString()).contains("demo:demo.trace_table");
+    }
+
+    @Test
     void aFixedPolicyClearsTheFinding() {
         when(clickHouse.query(any(), any(), any())).thenReturn(List.of(Map.of("probe", 1)));
         RowPolicyCheck check = check(ReportingProperties.RowPolicyCheck.STRICT);

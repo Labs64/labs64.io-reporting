@@ -27,7 +27,8 @@ import io.micrometer.core.instrument.MeterRegistry;
  * policy on its base table passes, and the reader needs no grant on the policy metadata.
  *
  * <p>Only that answer counts against readiness. A store that does not answer says nothing about a policy and already
- * shows as a 503 per query; it must not take the pods out as well. An empty table can't be proven, hence the recheck.
+ * shows as a 503 per query; it must not take the pods out as well. Saying nothing works both ways: a table found
+ * unprotected stays so until a probe proves the opposite. An empty table can't be proven, hence the recheck.
  */
 @Component("rowPoliciesHealthIndicator")
 public class RowPolicyCheck implements HealthIndicator {
@@ -59,11 +60,14 @@ public class RowPolicyCheck implements HealthIndicator {
     @Scheduled(initialDelayString = "${labs64.reporting.row-policy-recheck:PT5M}",
             fixedDelayString = "${labs64.reporting.row-policy-recheck:PT5M}")
     public void check() {
+        Set<String> before = unprotected;
         Set<String> found = new TreeSet<>();
         catalogues.all().forEach((tenant, catalogue) -> {
             for (String table : tables(catalogue)) {
-                if (readableWithoutPolicy(catalogue.database(), table)) {
-                    found.add(tenant + ":" + catalogue.database() + "." + table);
+                String name = tenant + ":" + catalogue.database() + "." + table;
+                Boolean readable = readableWithoutPolicy(catalogue.database(), table);
+                if (readable == null ? before.contains(name) : readable) {
+                    found.add(name);
                 }
             }
         });
@@ -79,13 +83,14 @@ public class RowPolicyCheck implements HealthIndicator {
         return unprotected.isEmpty() ? health.build() : health.withDetail("unprotectedTables", unprotected).build();
     }
 
-    private boolean readableWithoutPolicy(String database, String table) {
+    /** Null: the store gave no answer, so nothing is known. */
+    private Boolean readableWithoutPolicy(String database, String table) {
         try {
             return !clickHouse.query(database, PROBE_SCOPE, new SqlQuery("SELECT 1 AS probe FROM " + table + " LIMIT 1",
                     java.util.Map.of())).isEmpty();
         } catch (ReportingException e) {
             LOG.warn("Could not check the row policy of {}.{}: {}", database, table, e.getMessage());
-            return false;
+            return null;
         }
     }
 

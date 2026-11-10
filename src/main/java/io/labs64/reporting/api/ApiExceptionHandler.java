@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import io.labs64.reporting.ReportingException;
 import jakarta.validation.ConstraintViolationException;
@@ -42,7 +43,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({ MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
             MissingRequestHeaderException.class, HandlerMethodValidationException.class,
-            ConstraintViolationException.class })
+            MethodArgumentTypeMismatchException.class, ConstraintViolationException.class })
     ResponseEntity<Error> invalid(Exception e) {
         return ResponseEntity.badRequest().body(new Error().code("INVALID_REQUEST").message("The request is invalid."));
     }

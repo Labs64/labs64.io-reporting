@@ -13,10 +13,11 @@ import org.slf4j.LoggerFactory;
 import io.labs64.reporting.ReportingException;
 
 /**
- * A fair share of the store's query slots: one scope can't take them all. Per pod, on purpose: it needs no shared
- * state, and the store's own limit stays the bound over all pods, so keep pods x limit under that limit.
+ * A fair share of a store's slots: one scope can't take them all. Per pod, on purpose: it needs no shared state, and
+ * the store's own limit stays the bound over all pods, so keep pods x limit under that limit. One instance per store:
+ * the queries have theirs, the archive reads theirs.
  */
-class ScopeLimiter {
+public class ScopeLimiter {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScopeLimiter.class);
 
@@ -24,12 +25,12 @@ class ScopeLimiter {
     private final Duration wait;
     private final Map<String, Slots> scopes = new ConcurrentHashMap<>();
 
-    ScopeLimiter(int permits, Duration wait) {
+    public ScopeLimiter(int permits, Duration wait) {
         this.permits = permits;
         this.wait = wait;
     }
 
-    <T> T run(String scope, Supplier<T> query) {
+    public <T> T run(String scope, Supplier<T> query) {
         // Counted, so an idle scope leaves no entry: scopes are as many as a tenant has customers.
         Slots slots = scopes.compute(scope, (name, existing) -> {
             Slots current = existing == null ? new Slots(new Semaphore(permits)) : existing;

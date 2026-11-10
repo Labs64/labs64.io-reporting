@@ -109,6 +109,16 @@ public class CatalogueRegistry {
             if (b.containsKey("keyPattern") && !b.containsKey("keyColumn")) {
                 throw new IllegalArgumentException("bodies: 'keyPattern' only applies with 'keyColumn'");
             }
+            if (b.containsKey("exclude") && !b.containsKey("keyColumn")) {
+                throw new IllegalArgumentException("bodies: 'exclude' only applies with 'keyColumn'");
+            }
+            if (b.containsKey("keyColumn") && !b.containsKey("keyPattern")) {
+                // A key read from a row is data: the catalogue has to say which keys a caller's row may name.
+                throw new IllegalArgumentException("bodies: 'keyColumn' needs a 'keyPattern'");
+            }
+            if (b.containsKey("keyPattern") && !required(b, "keyPattern").contains("{scope}")) {
+                LOG.warn("bodies.keyPattern has no {scope}: only the row policy keeps a caller to its own originals.");
+            }
             String group = b.get("group") == null ? null : required(b, "group");
             bodies = new Bodies(group,
                     b.containsKey("keyTemplate") ? required(b, "keyTemplate") : null,
