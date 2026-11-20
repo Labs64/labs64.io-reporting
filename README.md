@@ -9,7 +9,7 @@
 [![📖 Documentation](https://img.shields.io/badge/📖-Documentation-AB6543.svg)](https://labs64.io/docs/modules/reporting/)
 [![Labs64.IO Ecosystem](https://img.shields.io/badge/Labs64.IO-Ecosystem-E14817.svg?logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii01IC01IDE1NSAxNTUiPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik0zIDNoMTM5djEzOUgzWk02OSAzdjEzOWg3VjNaTTQzIDQzdjU5aDI2VjQzWk03NiA0M3Y1OWgyNlY0M1oiLz48cGF0aCBmaWxsPSIjYmJiIiBkPSJNNDkgNDloNDd2NDdINDlaIi8%2BPC9zdmc%2B)](https://labs64.io)
 
-<p align="center"><img src="docs/assets/reporting-hero.svg" alt="Reporting: One ClickHouse table holds the rows of many customers. The same calls metric, requested for acme and then globex, shows each customer its own rows and its own numbers while every other row stays masked; metrics come from a reviewed catalogue, never from SQL." width="880"></p>
+<p align="center"><img src="assets/reporting-hero.svg" alt="Reporting: One ClickHouse table holds the rows of many customers. The same calls metric, requested for acme and then globex, shows each customer its own rows and its own numbers while every other row stays masked; metrics come from a reviewed catalogue, never from SQL." width="880"></p>
 
 [**Get started**](#try-it-in-two-minutes) · [Features](#features) · [Architecture](#architecture) · [Catalogue](#the-catalogue) · [AI agents](#using-it-with-ai-agents) · [Ecosystem](#the-labs64io-ecosystem) · [Documentation](https://labs64.io/docs/modules/reporting/) · [labs64.io](https://labs64.io)
 
