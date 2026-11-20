@@ -5,7 +5,7 @@
 # Starts the service next to a ClickHouse holding a small demo tenant (examples/demo). Pin a release with
 # REPORTING_VERSION=0.0.1 (default: latest).
 #
-# This is an evaluation setup: there is no API gateway in front of it, so you send the X-Auth-* headers a gateway
+# This is an evaluation setup: there is no Auth Gateway in front of it, so you send the X-Auth-* headers a gateway
 # would set yourself (see the README). Do not expose it. For the full stack (gateway, authentication, Cerbos) use the
 # Labs64.IO Quickstart: https://labs64.io/docs/getting-started/quickstart/
 services:
